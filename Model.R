@@ -1,6 +1,7 @@
 options(scipen = 100, digits = 5)
 
 library(heemod)
+library(tidyverse)
 
 # heemod requires defining transition matrices, states (costs, utilities) 
 # Two separate cohorts: Male and female
@@ -41,4 +42,4 @@ state_dead <- define_state(
 # Remission can be associated with reduced quality of life and increased costs (e.g. from screening)
 # https://doi.org/10.1186/s12885-019-5614-4
 
-# Time-varying probabilities
+
