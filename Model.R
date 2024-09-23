@@ -3,13 +3,13 @@ options(scipen = 100, digits = 5)
 library(heemod)
 library(tidyverse)
 
-# heemod requires defining transition matrices, states (costs, utilities) 
+# heemod requires defining transition matrices, states (costs, utilities)
 # Two separate cohorts: Male and female
 # Four HPV-associated cancers: oropharyngeal, cervical, penile, and anal
 # Female model: oropharyngeal, cervical, anal, vulval?, vaginal?
 # Male model: oropharyngeal, penile, anal
 
-# Two options for model states: 
+# Two options for model states:
 # 1) either have a cancer state where people stay until they die
 # 2) or have a cancer - remission state where people can cycle between
 # States: healthy, dead, cancer 1, cancer 2, cancer 3, remission 1, remission 2, remission 3
@@ -43,3 +43,6 @@ state_dead <- define_state(
 # https://doi.org/10.1186/s12885-019-5614-4
 
 
+# Can now obtain samples for probability of contracting cervical cancer each year using:
+rnorm(1, mean = baseline_mortality_female$fit[1], sd = baseline_mortality_female$se.fit[1])
+# This can be integrated into the heemod package by using rnorm(1, preds$fit[model_time], preds$se.fit[model_time])
