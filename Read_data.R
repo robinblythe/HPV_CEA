@@ -37,47 +37,46 @@ incidence_rates <- rbind(
   fn_incidence(
     "F",
     df_cervical,
-    subset(census, Group == "Female"),
+    census,
     "Cervical"
   ),
   fn_incidence(
     "F",
     df_vaginal,
-    subset(census, Group == "Female"),
+    census,
     "Vaginal"
   ),
   fn_incidence(
     "F",
     df_oropharyngeal,
-    subset(census, Group == "Female"),
+    census,
     "Oropharyngeal"
   ),
   fn_incidence(
     "F",
     df_anal,
-    subset(census, Group == "Female"),
+    census,
     "Anal"
   ),
   fn_incidence(
     "M",
     df_oropharyngeal,
-    subset(census, Group == "Male"),
+    census,
     "Oropharyngeal"
   ),
   fn_incidence(
     "M",
     df_anal,
-    subset(census, Group == "Male"),
+    census,
     "Anal"
   ),
   fn_incidence(
     "M",
     df_penile,
-    subset(census, Group == "Male"),
+    census,
     "Penile"
   )
-) |>
-  mutate(Group = ifelse(Group == "F", "Female", "Male"))
+)
 
 remove(df_cervical, df_vaginal, df_oropharyngeal, df_anal, df_penile)
 
@@ -90,50 +89,49 @@ df_penile_mort <- vroom("./Data/hpv_penile_mort.csv", col_types = c(gender = "c"
 
 # Cancer-specific death rates
 death_rates <- rbind(
-  fn_incidence(
+  fn_cancer_mortality(
     "F",
     df_cervical_mort,
-    subset(census, Group == "Female"),
+    incidence_rates,
     "Cervical"
   ),
-  fn_incidence(
+  fn_cancer_mortality(
     "F",
     df_vaginal_mort,
-    subset(census, Group == "Female"),
+    incidence_rates,
     "Vaginal"
   ),
-  fn_incidence(
+  fn_cancer_mortality(
     "F",
     df_oropharyngeal_mort,
-    subset(census, Group == "Female"),
+    incidence_rates,
     "Oropharyngeal"
   ),
-  fn_incidence(
+  fn_cancer_mortality(
     "F",
     df_anal_mort,
-    subset(census, Group == "Female"),
+    incidence_rates,
     "Anal"
   ),
-  fn_incidence(
+  fn_cancer_mortality(
     "M",
     df_oropharyngeal_mort,
-    subset(census, Group == "Male"),
+    incidence_rates,
     "Oropharyngeal"
   ),
-  fn_incidence(
+  fn_cancer_mortality(
     "M",
     df_anal_mort,
-    subset(census, Group == "Male"),
+    incidence_rates,
     "Anal"
   ),
-  fn_incidence(
+  fn_cancer_mortality(
     "M",
     df_penile_mort,
-    subset(census, Group == "Male"),
+    incidence_rates,
     "Penile"
   )
-) |>
-  mutate(Group = ifelse(Group == "F", "Female", "Male"))
+)
 
 remove(df_cervical_mort, df_vaginal_mort, df_oropharyngeal_mort, df_anal_mort, df_penile_mort)
 
@@ -142,11 +140,12 @@ remove(df_cervical_mort, df_vaginal_mort, df_oropharyngeal_mort, df_anal_mort, d
 
 baseline_less_cancer <- death_rates |>
   group_by(Age, Group) |>
-  summarise(Freq = sum(Freq)) |>
+  summarise(Deaths = sum(Deaths)) |>
   full_join(census) |>
   mutate(
-    Deaths_adjusted = N_deaths - Freq,
+    Deaths_adjusted = N_deaths - Deaths,
     Rate = Deaths_adjusted / Pop_total
-  )
+  ) |>
+  select(Age, Group, Deaths_adjusted, Rate)
 
-remove(census, fn_incidence)
+remove(census, fn_incidence, fn_cancer_mortality)
