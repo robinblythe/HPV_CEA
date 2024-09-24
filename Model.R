@@ -1,3 +1,8 @@
+# Unique research question:
+# If we vaccinate both boys and girls aged 10, how does this impact the effect
+
+
+
 options(scipen = 100, digits = 5)
 
 library(heemod)
