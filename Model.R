@@ -1,6 +1,6 @@
 # Unique research question:
-# If we vaccinate both boys and girls aged 10, how does this impact the effect
-
+# If we vaccinate both boys and girls aged 10, how does this impact cancer rates and budget?
+# Need to do forecasting for this: assume program begins 2025, runs to end
 
 
 options(scipen = 100, digits = 5)

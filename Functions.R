@@ -62,11 +62,9 @@ fn_cancer_mortality <- function(Gender, mortality_data, incidence_data, dx_group
     unnest(Age) |>
     group_by(Age, Group, Diagnosis) |>
     summarise(Deaths = mean(Deaths)) |>
-    left_join(incidence_data, by = join_by(Age, Group, Diagnosis), keep = F) |>
-    mutate(Deaths = ifelse(Deaths > Freq, Freq, Deaths),
-           Rate = Deaths / Freq,
-           Rate = ifelse(is.nan(Rate), 0, Rate)) |>
-    select(-Freq)
+    left_join(census) |>
+    mutate(Rate = Deaths / Pop_total) |>
+    select(-c(Pr_death_annual, N_deaths))
   
 }
 

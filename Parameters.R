@@ -1,17 +1,40 @@
 # Time-varying transition probabilities
-# Manipulate the HPV diagnosis set to represent an annual probability
 source("./Read_data.R")
 library(rms)
+library(forecast)
 
 # Obtaining probabilities with SE
 probs <- list()
-# Baseline mortality
+groupnames <- list(
+  Baseline_mortality = c("Baseline mortality (female)", "Baseline mortality (male)"),
+  Incidence = c("Cervical cancer incidence",
+                "Vaginal/vulval cancer incidence",
+                "Oropharyngeal cancer incidence (female)",
+                "Oropharyngeal cancer incidence (male)",
+                "Anal cancer incidence (female)",
+                "Anal cancer incidence (male)",
+                "Penile cancer incidence"),
+  Cancer_mortality = c("Cervical cancer mortality",
+                       "Vaginal/vulval cancer mortality",
+                       "Oropharyngeal cancer mortality (female)",
+                       "Oropharyngeal cancer mortality (male)",
+                       "Anal cancer mortality (female)",
+                       "Anal cancer mortality (male)",
+                       "Penile cancer mortality")
+)
+# Baseline mortality, non-HPV related deaths
 baseline_mortality <- baseline_less_cancer |>
   group_by(Group) |>
   nest() 
 models <- map(baseline_mortality$data, tp_model)
-probs$baseline_mortality_female <- do.call(cbind, predict(models[[1]], type = "response", se.fit = T)[1:2])
-probs$baseline_mortality_male <- do.call(cbind, predict(models[[2]], type = "response", se.fit = T)[1:2])
+
+for (i in 1:length(groupnames$Baseline_mortality)){
+  probs[[i]] <- tibble(
+    Group = groupnames$Baseline_mortality[[i]],
+    Age = seq(10, 84, 1),
+    do.call(data.frame, predict(models[[i]], type = "response", se.fit = T)[1:2])
+  )
+}
 remove(baseline_mortality, baseline_less_cancer, models)
 
 # Cancer incidence
@@ -20,14 +43,13 @@ cancer_rates <- incidence_rates |>
   nest()
 models <- map(cancer_rates$data, tp_model)
 
-probs$i_cerv_female <- do.call(cbind, predict(models[[1]], type = "response", se.fit = T)[1:2])
-probs$i_vaginal_female <- do.call(cbind, predict(models[[2]], type = "response", se.fit = T)[1:2])
-probs$i_oro_female <- do.call(cbind, predict(models[[3]], type = "response", se.fit = T)[1:2])
-probs$i_oro_male <- do.call(cbind, predict(models[[4]], type = "response", se.fit = T)[1:2])
-probs$i_anal_female <- do.call(cbind, predict(models[[5]], type = "response", se.fit = T)[1:2])
-probs$i_anal_male <- do.call(cbind, predict(models[[6]], type = "response", se.fit = T)[1:2])
-probs$i_penile_male <- do.call(cbind, predict(models[[7]], type = "response", se.fit = T)[1:2])
-
+for (i in 1:length(groupnames$Incidence)) {
+  probs[[i+2]] <- tibble(
+    Group = groupnames$Incidence[[i]],
+    Age = seq(10, 84, 1),
+    do.call(data.frame, predict(models[[i]], type = "response", se.fit = T)[1:2])
+  )
+}
 remove(cancer_rates, incidence_rates, models)
 
 # Cancer mortality
@@ -36,17 +58,32 @@ cancer_deaths <- death_rates |>
   nest()
 models <- map(cancer_deaths$data, tp_model)
 
-probs$mort_cerv_female <- do.call(cbind, predict(models[[1]], type = "response", se.fit = T)[1:2])
-probs$mort_vaginal_female <- do.call(cbind, predict(models[[2]], type = "response", se.fit = T)[1:2])
-probs$mort_oro_female <- do.call(cbind, predict(models[[3]], type = "response", se.fit = T)[1:2])
-probs$mort_oro_male <- do.call(cbind, predict(models[[4]], type = "response", se.fit = T)[1:2])
-probs$mort_anal_female <- do.call(cbind, predict(models[[5]], type = "response", se.fit = T)[1:2])
-probs$mort_anal_male <- do.call(cbind, predict(models[[6]], type = "response", se.fit = T)[1:2])
-probs$mort_penile_male <- do.call(cbind, predict(models[[7]], type = "response", se.fit = T)[1:2])
-
+for (i in 1:length(groupnames$Cancer_mortality)) {
+  probs[[i+9]] <- tibble(
+    Group = groupnames$Cancer_mortality[[i]],
+    Age = seq(10, 84, 1),
+    do.call(data.frame, predict(models[[i]], type = "response", se.fit = T)[1:2])
+  )
+}
 remove(cancer_deaths, death_rates, models)
 
+probs1 <- lapply(probs, setNames, c("Group", "Age", "Fit", "SE.fit"))
+probabilities <- do.call(rbind, probs1)
+remove(probs, probs1, i, groupnames)
 
-# Health utilities
+# Visual test of model fitted values
+p1 <- probabilities |> ggplot()
+p1 +
+  geom_smooth(aes(x = Age, y = Fit)) +
+  facet_wrap(vars(Group), scales = "free_y")
 
 
+# Predicted population of 10-year-olds
+pop10_boys <- ts(subset(population_age_10, Group == "Male")$Population, 
+                 start = 1980)
+pop10_girls <- ts(subset(population_age_10, Group == "Female")$Population, 
+                  start = 1980)
+
+
+pop10_boys |> diff(lag = 12) |> diff() |> ggtsdisplay()
+pop10_boys |> Arima(order = c(0, 1, 1), seasonal = c(0, 1, 1)) |> autoplot()
