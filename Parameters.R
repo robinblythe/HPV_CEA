@@ -72,18 +72,33 @@ probabilities <- do.call(rbind, probs1)
 remove(probs, probs1, i, groupnames)
 
 # Visual test of model fitted values
-p1 <- probabilities |> ggplot()
-p1 +
-  geom_smooth(aes(x = Age, y = Fit)) +
-  facet_wrap(vars(Group), scales = "free_y")
+# p1 <- probabilities |> ggplot()
+# p1 +
+#   geom_smooth(aes(x = Age, y = Fit)) +
+#   facet_wrap(vars(Group), scales = "free_y") +
+#   theme_bw()
 
 
 # Predicted population of 10-year-olds
 pop10_boys <- ts(subset(population_age_10, Group == "Male")$Population, 
                  start = 1980)
-pop10_girls <- ts(subset(population_age_10, Group == "Female")$Population, 
-                  start = 1980)
+
+train <- window(pop10_boys, end = 2013)
+test <- window(pop10_boys, start = 2014)
+
+fit1 <- meanf(train, h = 12)
+fit2 <- rwf(train, h = 12)
+fit3 <- snaive(train, h = 12)
+
+autoplot(pop10_boys) +
+  autolayer(fit1, series = "Mean", PI = FALSE) +
+  autolayer(fit2, series = "Naive", PI = FALSE) +
+  autolayer(fit3, series = "Seasonal naive", PI = FALSE)
 
 
 pop10_boys |> diff(lag = 12) |> diff() |> ggtsdisplay()
 pop10_boys |> Arima(order = c(0, 1, 1), seasonal = c(0, 1, 1)) |> autoplot()
+
+
+pop10_girls <- ts(subset(population_age_10, Group == "Female")$Population, 
+                  start = 1980)
