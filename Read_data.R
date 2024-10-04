@@ -1,5 +1,6 @@
 library(vroom)
 library(tidyverse)
+library(rms)
 
 source("./Functions.R")
 
@@ -165,3 +166,26 @@ population_age_10 <- df_census |>
   mutate(Year = as.numeric(Year))
 
 remove(df_census)
+
+# Median income by age group
+df_median_income <- vroom("./Data/Median_income_by_age.csv", delim = ",", show_col_types = F)
+
+incomes <- df_median_income |>
+  rowwise() |>
+  mutate(start_age = substr(Age, 1, 2),
+         end_age = substr(Age, 6, 7),
+         Age = list(seq(start_age, end_age, 1))) |>
+  unnest(Age) |>
+  select(Age, Total) |>
+  bind_rows(tibble(
+    Age = c(
+      seq(10, 14, 1),
+      seq(65, 84, 1)
+      ),
+    Total = c(
+      rep(0, 5),
+      rep(NA_real_, 20))
+  )) |>
+  arrange(Age)
+  
+remove(df_median_income)

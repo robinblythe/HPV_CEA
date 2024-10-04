@@ -1,7 +1,5 @@
 ### Model parameters
 source("./Read_data.R")
-library(rms)
-
 
 ##########################################
 ## Time-varying transition probabilities
@@ -103,7 +101,17 @@ discount <- 0.03
 # Note that the employee is worth more than their wage - could use a 'wage multiplier'
 # https://pubmed.ncbi.nlm.nih.gov/16200550/
 # Or just GDP per capita???
-wage_multiplier <- 1.28
+
+# Estimate median wage across the workforce:
+fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
+income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
+  as_tibble() |>
+  rename(Age = x,
+         Total = y)
+
+remove(fit, incomes)
+
+
 
 
 costs <- list()
