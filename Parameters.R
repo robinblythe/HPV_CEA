@@ -1,9 +1,11 @@
-# Time-varying transition probabilities
+### Model parameters
 source("./Read_data.R")
 library(rms)
-library(forecast)
 
-# Obtaining probabilities with SE
+
+##########################################
+## Time-varying transition probabilities
+# Obtain probabilities from incidence, baseline mortality rates
 probs <- list()
 groupnames <- list(
   Baseline_mortality = c("Baseline mortality (female)", "Baseline mortality (male)"),
@@ -22,6 +24,7 @@ groupnames <- list(
                        "Anal cancer mortality (male)",
                        "Penile cancer mortality")
 )
+
 # Baseline mortality, non-HPV related deaths
 baseline_mortality <- baseline_less_cancer |>
   group_by(Group) |>
@@ -53,6 +56,7 @@ for (i in 1:length(groupnames$Incidence)) {
 remove(cancer_rates, incidence_rates, models)
 
 # Cancer mortality
+# Can use KM curves from the data request to get risk of death? No censoring
 cancer_deaths <- death_rates |>
   group_by(Group, Diagnosis) |>
   nest()
@@ -71,34 +75,43 @@ probs1 <- lapply(probs, setNames, c("Group", "Age", "Fit", "SE.fit"))
 probabilities <- do.call(rbind, probs1)
 remove(probs, probs1, i, groupnames)
 
-# Visual test of model fitted values
-# p1 <- probabilities |> ggplot()
-# p1 +
-#   geom_smooth(aes(x = Age, y = Fit)) +
-#   facet_wrap(vars(Group), scales = "free_y") +
-#   theme_bw()
+# Probabilities for routine screening from age 10 to 84
+# https://doi.org/10.1002/ijgo.12126
+# Pap smear every 3 years from 25 to 65
+pap <- tibble(
+  Group = "Pap smear (female)",
+  Age = seq(10, 84, 1),
+  Fit = case_when(
+    Age >= 25 & Age < 65 ~ (1/3),
+    .default = 0
+  ),
+  SE.fit = 0
+)
+probabilities <- bind_rows(probabilities, pap)
+remove(pap)
+
+# Probability that pap smear requires follow-up colposcopy
+# https://doi.org/10.47102/annals-acadmedsg.2023329
+pr_positive_pap <- c(Events = 292, Non_events = (10967 - 292))
 
 
-# Predicted population of 10-year-olds
-pop10_boys <- ts(subset(population_age_10, Group == "Male")$Population, 
-                 start = 1980)
+################################################
 
-train <- window(pop10_boys, end = 2013)
-test <- window(pop10_boys, start = 2014)
+## Program costs
+discount <- 0.03
 
-fit1 <- meanf(train, h = 12)
-fit2 <- rwf(train, h = 12)
-fit3 <- snaive(train, h = 12)
-
-autoplot(pop10_boys) +
-  autolayer(fit1, series = "Mean", PI = FALSE) +
-  autolayer(fit2, series = "Naive", PI = FALSE) +
-  autolayer(fit3, series = "Seasonal naive", PI = FALSE)
+# Note that the employee is worth more than their wage - could use a 'wage multiplier'
+# https://pubmed.ncbi.nlm.nih.gov/16200550/
+# Or just GDP per capita???
+wage_multiplier <- 1.28
 
 
-pop10_boys |> diff(lag = 12) |> diff() |> ggtsdisplay()
-pop10_boys |> Arima(order = c(0, 1, 1), seasonal = c(0, 1, 1)) |> autoplot()
+costs <- list()
 
+# HPV vaccination costs
+# https://www.sciencedirect.com/science/article/pii/S0264410X21003212
+costs$vc <- 376
 
-pop10_girls <- ts(subset(population_age_10, Group == "Female")$Population, 
-                  start = 1980)
+# Cost savings from pap smears
+costs$pap <- 43 * (1 + discount)^(2024 - 2011)
+costs$colposcopy <- 109.73 * (1 + discount)^(2024 - 2011)
