@@ -103,14 +103,22 @@ discount <- 0.03
 # Or just GDP per capita???
 
 # Estimate median wage across the workforce:
+# Spar term chosen by visual analysis to create a smoothed quadratic curve
 fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
 income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
   as_tibble() |>
   rename(Age = x,
          Total = y)
 
+# Fit check
+p <- incomes |> ggplot(aes(x = Age, y = Total)) +
+  geom_line() +
+  geom_line(data = income, aes(x = Age, y = Total))
+p
 remove(fit, incomes)
 
+
+# Estimate employment rate across the workforce
 
 
 

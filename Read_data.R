@@ -189,3 +189,10 @@ incomes <- df_median_income |>
   arrange(Age)
   
 remove(df_median_income)
+
+
+# Labour force participation by age group
+df_employment <- vroom("./Data/labour_participation_rate.csv", show_col_types = F)
+employment <- df_employment |>
+  select(-year) |>
+  
