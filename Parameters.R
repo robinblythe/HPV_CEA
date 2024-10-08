@@ -102,26 +102,6 @@ discount <- 0.03
 # https://pubmed.ncbi.nlm.nih.gov/16200550/
 # Or just GDP per capita???
 
-# Estimate median wage across the workforce:
-# Spar term chosen by visual analysis to create a smoothed quadratic curve
-fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
-income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
-  as_tibble() |>
-  rename(Age = x,
-         Total = y)
-
-# Fit check
-p <- incomes |> ggplot(aes(x = Age, y = Total)) +
-  geom_line() +
-  geom_line(data = income, aes(x = Age, y = Total))
-p
-remove(fit, incomes)
-
-
-# Estimate employment rate across the workforce
-
-
-
 costs <- list()
 
 # HPV vaccination costs
@@ -131,3 +111,22 @@ costs$vc <- 376
 # Cost savings from pap smears
 costs$pap <- 43 * (1 + discount)^(2024 - 2011)
 costs$colposcopy <- 109.73 * (1 + discount)^(2024 - 2011)
+
+
+
+
+
+# Workforce participation due to cancers
+median_income <- median_income |>
+  rowwise() |>
+  mutate(Participation_rate_female_repro = ifelse(Sex == "Female", Participation_rate/1.37/1.28, NA_real_),
+         Participation_rate_oro = Participation_rate/1.37/2.47,
+         Participation_rate_other = Participation_rate/1.37)
+
+# Return to work following diagnosis
+sick_leave <- list()
+
+# Pelvic cancer RTW ~ 3.2 months 
+# https://www.mdpi.com/2072-6694/14/9/2330
+# Used ShinyPrior to estimate Gamma dist
+ sick_leave$pelvic <- rgamma(iter, shape = 1.646, scale = 1.934)

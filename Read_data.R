@@ -195,4 +195,37 @@ remove(df_median_income)
 df_employment <- vroom("./Data/labour_participation_rate.csv", show_col_types = F)
 employment <- df_employment |>
   select(-year) |>
-  
+  rowwise() |>
+  mutate(start_age = substr(age, 1, 2),
+         end_age = substr(age, 4, 5),
+         Age = list(seq(start_age, end_age, 1))) |>
+  unnest(Age) |>
+  mutate(Participation_rate = resident_labour_force_participation_rate/100,
+         Sex = ifelse(sex == "male", "Male", "Female")) |>
+  select(Age, Sex, Participation_rate)
+
+remove(df_employment)
+
+# Estimate median wage across the workforce to generate senior incomes:
+# Spar term chosen by visual analysis to create a smoothed quadratic curve
+fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
+income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
+  as_tibble() |>
+  rename(Age = x,
+         Total = y) |>
+  mutate(Total_income = ifelse(Total < 0, 0, Total)) |>
+  select(-Total)
+
+# Fit check
+incomes |> ggplot(aes(x = Age, y = Total)) +
+  geom_line() +
+  geom_line(data = income, aes(x = Age, y = Total_income))
+
+# Merge employment with incomes to get an adjusted total income (annual)
+median_income <- employment |>
+  left_join(income) |>
+  mutate(Weighted_income_annual = Participation_rate * Total_income * 12)
+
+remove(income, incomes, employment, fit)
+
+
