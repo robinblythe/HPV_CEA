@@ -213,18 +213,18 @@ income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
   as_tibble() |>
   rename(Age = x,
          Total = y) |>
-  mutate(Total_income = ifelse(Total < 0, 0, Total)) |>
+  mutate(Monthly_income = ifelse(Total < 0, 0, Total)) |>
   select(-Total)
 
 # Fit check
 incomes |> ggplot(aes(x = Age, y = Total)) +
   geom_line() +
-  geom_line(data = income, aes(x = Age, y = Total_income))
+  geom_line(data = income, aes(x = Age, y = Monthly_income))
 
 # Merge employment with incomes to get an adjusted total income (annual)
 median_income <- employment |>
   left_join(income) |>
-  mutate(Weighted_income_annual = Participation_rate * Total_income * 12)
+  mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12)
 
 remove(income, incomes, employment, fit)
 

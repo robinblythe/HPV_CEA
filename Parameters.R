@@ -73,6 +73,10 @@ probs1 <- lapply(probs, setNames, c("Group", "Age", "Fit", "SE.fit"))
 probabilities <- do.call(rbind, probs1)
 remove(probs, probs1, i, groupnames)
 
+
+
+
+# Currently unsure whether to add to model
 # Probabilities for routine screening from age 10 to 84
 # https://doi.org/10.1002/ijgo.12126
 # Pap smear every 3 years from 25 to 65
@@ -93,27 +97,43 @@ remove(pap)
 pr_positive_pap <- c(Events = 292, Non_events = (10967 - 292))
 
 
+
+
+
+
+
+# Attributions to HPV
+pct_hpv <- list()
+# Proportion of oropharyngeal cancers that are HPV-related
+# https://doi.org/10.1200/JCO.2011.36.4596
+pct_hpv$oropharyngeal <- c(Events = 32, Non_events = (46 - 32))
+
+# Probability that HPV vaccination averts cancer diagnosis
+vaccine_eff <- list()
+# Oropharyngeal effectiveness of ~ 93.3%
+# https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0068329
+vaccine_eff$oropharyngeal <- c(Events = 2909, Non_events = 15)
+# 
+
+
+  
+# Current rate of vaccine uptake
+# https://journals.sagepub.com/doi/full/10.1177/2158244014554961
+pr_vaccinated_female <- c(Events = 28, Non_events = (208 - 26))
+
 ################################################
 
-## Program costs
-discount <- 0.03
-
-# Note that the employee is worth more than their wage - could use a 'wage multiplier'
-# https://pubmed.ncbi.nlm.nih.gov/16200550/
-# Or just GDP per capita???
-
-costs <- list()
+## Costs
+discount = 0.03
 
 # HPV vaccination costs
 # https://www.sciencedirect.com/science/article/pii/S0264410X21003212
-costs$vc <- 376
+cost_vc = 376
 
-# Cost savings from pap smears
-costs$pap <- 43 * (1 + discount)^(2024 - 2011)
-costs$colposcopy <- 109.73 * (1 + discount)^(2024 - 2011)
-
-
-
+# Cost savings from pap smears averted (if done)
+# costs$pap <- 43 * (1 + discount)^(2024 - 2011)
+# costs$colposcopy <- 109.73 * (1 + discount)^(2024 - 2011)
+# Intending to calculate cancer cost savings?
 
 
 # Workforce participation due to cancers
@@ -121,12 +141,31 @@ median_income <- median_income |>
   rowwise() |>
   mutate(Participation_rate_female_repro = ifelse(Sex == "Female", Participation_rate/1.37/1.28, NA_real_),
          Participation_rate_oro = Participation_rate/1.37/2.47,
-         Participation_rate_other = Participation_rate/1.37)
+         Participation_rate_other_cancer = Participation_rate/1.37,
+         Weighted_income_female_repro = Participation_rate_female_repro * Monthly_income * 12,
+         Weighted_income_oro = Participation_rate_oro * Monthly_income * 12,
+         Weighted_income_other_cancer = Participation_rate_other_cancer * Monthly_income * 12)
 
 # Return to work following diagnosis
-sick_leave <- list()
+# Assign as a wage decrement to median income
+# Labour force participation (baseline) * monthly income * -leave duration (months)
 
-# Pelvic cancer RTW ~ 3.2 months 
+# Female pelvic cancer RTW ~ 3.2 months 
 # https://www.mdpi.com/2072-6694/14/9/2330
-# Used ShinyPrior to estimate Gamma dist
- sick_leave$pelvic <- rgamma(iter, shape = 1.646, scale = 1.934)
+# Used ShinyPrior to estimate Gamma dist based on 3.2 months median (range 0 - 33.1)
+# Roughly equivalent to Gamma dist with mean = 3.9 and SE = 3/sqrt(101)
+# rgamma(iter, shape = 114.916, scale = 0.028)
+
+# Oropharyngeal cancer RTW
+# https://www.sciencedirect.com/science/article/pii/S0360301619337514
+# ShinyPrior: Mean 6.8 months, SE = 5.8/sqrt(58)
+# rgamma(iter, shape = 79.724, rate = 0.085)
+
+# Colorectal cancer RTW
+# https://academic.oup.com/bjs/article/107/1/140/6121017
+# Used ShinyPrior to estimate Gamma dist based on (95% CI 379, 467) days, n = 317
+# This is roughly equivalent to Gamma(93890.743,0.005)
+# rgamma(iter, shape = 93890.743, scale = 0.005)/(30.437)
+
+
+

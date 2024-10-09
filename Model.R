@@ -1,30 +1,13 @@
-# Unique research question:
-# If we vaccinate both boys and girls aged 10, how does this impact cancer rates and budget?
-# Need to do forecasting for this: assume program begins 2025, runs to end
-
-
 options(scipen = 100, digits = 5)
-
 library(heemod)
-library(tidyverse)
+
+source("./Parameters.R")
 
 # heemod requires defining transition matrices, states (costs, utilities)
 # Two separate cohorts: Male and female
-# Four HPV-associated cancers: oropharyngeal, cervical, penile, and anal
-# Female model: oropharyngeal, cervical, anal, vulval?, vaginal?
-# Male model: oropharyngeal, penile, anal
-
-# Two options for model states:
-# 1) either have a cancer state where people stay until they die
-# 2) or have a cancer - remission state where people can cycle between
-# States: healthy, dead, cancer 1, cancer 2, cancer 3, remission 1, remission 2, remission 3
-
-# Need the incremental cost of HPV treatment compared to standard
-# Baseline mortality will include HPV mortality, so will be double counting (limiting vaccine effectiveness)
-
-# Cohort needs to be sufficient size to get individual cases
-
-# If HPV vaccination is widespread then we may also be able to avoid pap smears - cost savings?
+# Three HPV-associated cancers in men: oropharyngeal, penile, and anal
+# Four HPV-associated cancers in women: oropharyngeal, cervical, vaginal/vulval, and anal
+# Three model states: Healthy, Diagnosed, Dead
 
 # Transition probability for cancer: vaccine efficacy * baseline probability of cancer
 # e.g., efficacy of 96% for an annual incidence of 0.5% = (1-0.96)*(0.005) = 0.0002
