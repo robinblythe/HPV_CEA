@@ -27,8 +27,10 @@ census_mort <- df_census_mort |>
 
 census <- df_census |>
   select(Age, Gender, `2021`) |>
-  rename(Pop_total = `2021`,
-         Group = Gender) |>
+  rename(
+    Pop_total = `2021`,
+    Group = Gender
+  ) |>
   mutate(Age = as.numeric(substr(Age, 1, 2))) |>
   left_join(census_mort) |>
   mutate(
@@ -172,22 +174,25 @@ df_median_income <- vroom("./Data/Median_income_by_age.csv", delim = ",", show_c
 
 incomes <- df_median_income |>
   rowwise() |>
-  mutate(start_age = substr(Age, 1, 2),
-         end_age = substr(Age, 6, 7),
-         Age = list(seq(start_age, end_age, 1))) |>
+  mutate(
+    start_age = substr(Age, 1, 2),
+    end_age = substr(Age, 6, 7),
+    Age = list(seq(start_age, end_age, 1))
+  ) |>
   unnest(Age) |>
   select(Age, Total) |>
   bind_rows(tibble(
     Age = c(
       seq(10, 14, 1),
       seq(65, 84, 1)
-      ),
+    ),
     Total = c(
       rep(0, 5),
-      rep(NA_real_, 20))
+      rep(NA_real_, 20)
+    )
   )) |>
   arrange(Age)
-  
+
 remove(df_median_income)
 
 
@@ -196,12 +201,16 @@ df_employment <- vroom("./Data/labour_participation_rate.csv", show_col_types = 
 employment <- df_employment |>
   select(-year) |>
   rowwise() |>
-  mutate(start_age = substr(age, 1, 2),
-         end_age = substr(age, 4, 5),
-         Age = list(seq(start_age, end_age, 1))) |>
+  mutate(
+    start_age = substr(age, 1, 2),
+    end_age = substr(age, 4, 5),
+    Age = list(seq(start_age, end_age, 1))
+  ) |>
   unnest(Age) |>
-  mutate(Participation_rate = resident_labour_force_participation_rate/100,
-         Sex = ifelse(sex == "male", "Male", "Female")) |>
+  mutate(
+    Participation_rate = resident_labour_force_participation_rate / 100,
+    Sex = ifelse(sex == "male", "Male", "Female")
+  ) |>
   select(Age, Sex, Participation_rate)
 
 remove(df_employment)
@@ -211,8 +220,10 @@ remove(df_employment)
 fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
 income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
   as_tibble() |>
-  rename(Age = x,
-         Total = y) |>
+  rename(
+    Age = x,
+    Total = y
+  ) |>
   mutate(Monthly_income = ifelse(Total < 0, 0, Total)) |>
   select(-Total)
 
@@ -227,5 +238,3 @@ median_income <- employment |>
   mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12)
 
 remove(income, incomes, employment, fit)
-
-

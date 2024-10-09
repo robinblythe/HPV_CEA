@@ -65,12 +65,12 @@ fn_cancer_mortality <- function(Gender, mortality_data, incidence_data, dx_group
     left_join(census) |>
     mutate(Rate = Deaths / Pop_total) |>
     select(-c(Pr_death_annual, N_deaths))
-  
 }
 
 # Fitting a quasibinomial glm quickly:
-tp_model <- function(df){
+tp_model <- function(df) {
   glm(Rate ~ rcs(Age, 5),
-      family = "quasibinomial",
-      data = df)
+    family = "quasibinomial",
+    data = df
+  )
 }
