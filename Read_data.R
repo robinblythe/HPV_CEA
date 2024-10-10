@@ -211,7 +211,12 @@ employment <- df_employment |>
     Participation_rate = resident_labour_force_participation_rate / 100,
     Sex = ifelse(sex == "male", "Male", "Female")
   ) |>
-  select(Age, Sex, Participation_rate)
+  select(Age, Sex, Participation_rate) |>
+  full_join(tibble(
+    Age = rep(seq(10, 14, 1), 2),
+    Sex = c(rep("Male", 5), rep("Female", 5)),
+    Participation_rate = rep(0, 10)
+  ))
 
 remove(df_employment)
 

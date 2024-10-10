@@ -1,12 +1,12 @@
 ### Model parameters
-source("./Read_data.R")
+source("./Read_data.R", print.eval = F)
 
 #########################################
 ## Income estimation
 # Estimate median wage across the workforce to generate senior incomes:
 # Spar term chosen by visual analysis to create a smoothed quadratic curve
 fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
-income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
+income <- do.call(cbind, predict(fit, x = seq(15, 84, 1))) |>
   as_tibble() |>
   rename(
     Age = x,
@@ -22,8 +22,11 @@ incomes |> ggplot(aes(x = Age, y = Total)) +
 
 # Merge employment with incomes to get an adjusted total income (annual)
 median_income <- employment |>
-  left_join(income) |>
-  mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12)
+  left_join(income, by = join_by(Age)) |>
+  mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12) %>%
+  replace(is.na(.), 0) |>
+  arrange(Sex, Age)
+  
 
 remove(income, incomes, employment, fit)
 
@@ -137,48 +140,33 @@ remove(probs, probs1, i, groupnames)
 # Probability of cancer attributable to HPV
 # https://onlinelibrary.wiley.com/doi/epdf/10.1002/ijc.30716
 pct_hpv <- list()
-pct_hpv$cervical <- 1
-pct_hpv$anal <- c(
-  Events = 35000,
-  Non_events = 5000
-)
-pct_hpv$vaginal <- c(
-  Events = (8500 + 12000),
-  Non_events = ((34000 - 8500) + (15000 - 12000))
-)
-pct_hpv$penile <- c(
-  Events = 13000,
-  Non_events = 26000
-)
-pct_hpv$oropharyngeal <- c(
-  Events = 29000,
-  Non_events = (96000 - 29000)
-)
-
+pct_hpv$cervical <- rep(1, iter)
+pct_hpv$anal <- rbeta(iter, shape1 = 35000, shape2 = 5000)
+pct_hpv$vaginal <- rbeta(iter, shape1 = (8500 + 12000), shape2 = ((34000 - 8500) + (15000 - 12000)))
+pct_hpv$penile <- rbeta(iter, shape1 = 13000, shape2 = 26000)
+pct_hpv$oropharyngeal <- rbeta(iter, shape1 = 29000, shape2 = (96000 - 29000))
 
 # Probability that HPV vaccination protects against cancer diagnosis (compared to naive)
 vaccine_eff <- list()
 # Cervical: https://www.nejm.org/doi/full/10.1056/NEJMoa1917338
-vaccine_eff$cervical <- c(shape1 = 0.773, shape2 = 7.787)
+vaccine_eff$cervical <- rbeta(iter, shape1 = 0.773, shape2 = 7.787)
 # Oral: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0068329#s3
-vaccine_eff$oral <- c(shape1 = 0.981, shape2 = 7.770)
+vaccine_eff$oral <- rbeta(iter, shape1 = 0.981, shape2 = 7.770)
 # Other/genital: source from https://www.sciencedirect.com/science/article/pii/S0755498214004771#bib0165
-vaccine_eff$female_genital <- c(shape1 = 0.930, shape2 = 18.548)
-vaccine_eff$male_genital <- c(shape1 = 7.524, shape2 = 39.539)
+vaccine_eff$female_genital <- rbeta(iter, shape1 = 0.930, shape2 = 18.548)
+vaccine_eff$male_genital <- rbeta(iter, shape1 = 7.524, shape2 = 39.539)
 
 # Current rate of vaccine uptake
 # https://journals.sagepub.com/doi/full/10.1177/2158244014554961
-
-pr_vaccinated_female <- c(Events = 28, Non_events = (208 - 26))
+# pr_vaccinated_female <- rbeta(iter, shape1 = 28, shape2 = (208 - 26))
 
 ################################################
 
 ## Costs
-discount <- 0.03
 
 # HPV vaccination costs
 # https://www.sciencedirect.com/science/article/pii/S0264410X21003212
-cost_vc <- c(376)
+cost_vc <- c(Bivalent = 123, Quadrivalent = 320, Nonavalent = 376)
 
 # Cost savings from pap smears averted (if done)
 # costs$pap <- 43 * (1 + discount)^(2024 - 2011)
@@ -199,22 +187,24 @@ median_income <- median_income |>
   )
 
 # Return to work following diagnosis
-# Assign as a wage decrement to median income
+# Assign as a wage decrement to median income (cancer)
 # Labour force participation (baseline) * monthly income * -leave duration (months)
+
+rtw <- list()
 
 # Female pelvic cancer RTW ~ 3.2 months
 # https://www.mdpi.com/2072-6694/14/9/2330
 # Used ShinyPrior to estimate Gamma dist based on 3.2 months median (range 0 - 33.1)
 # Roughly equivalent to Gamma dist with mean = 3.9 and SE = 3/sqrt(101)
-# rgamma(iter, shape = 114.916, scale = 0.028)
+rtw$pelvic_female <- rgamma(iter, shape = 114.916, scale = 0.028)
 
 # Oropharyngeal cancer RTW
 # https://www.sciencedirect.com/science/article/pii/S0360301619337514
 # ShinyPrior: Mean 6.8 months, SE = 5.8/sqrt(58)
-# rgamma(iter, shape = 79.724, rate = 0.085)
+rtw$oropharyngeal <- rgamma(iter, shape = 79.724, scale = 0.085)
 
 # Colorectal cancer RTW
 # https://academic.oup.com/bjs/article/107/1/140/6121017
 # Used ShinyPrior to estimate Gamma dist based on (95% CI 379, 467) days, n = 317
 # This is roughly equivalent to Gamma(93890.743,0.005)
-# rgamma(iter, shape = 93890.743, scale = 0.005)/(30.437)
+rtw$genital_daily <- rgamma(iter, shape = 93890.743, scale = 0.005)
