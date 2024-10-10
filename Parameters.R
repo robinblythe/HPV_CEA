@@ -1,6 +1,34 @@
 ### Model parameters
 source("./Read_data.R")
 
+#########################################
+## Income estimation
+# Estimate median wage across the workforce to generate senior incomes:
+# Spar term chosen by visual analysis to create a smoothed quadratic curve
+fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
+income <- do.call(cbind, predict(fit, x = seq(10, 84, 1))) |>
+  as_tibble() |>
+  rename(
+    Age = x,
+    Total = y
+  ) |>
+  mutate(Monthly_income = ifelse(Total < 0, 0, Total)) |>
+  select(-Total)
+
+# Fit check
+incomes |> ggplot(aes(x = Age, y = Total)) +
+  geom_line() +
+  geom_line(data = income, aes(x = Age, y = Monthly_income))
+
+# Merge employment with incomes to get an adjusted total income (annual)
+median_income <- employment |>
+  left_join(income) |>
+  mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12)
+
+remove(income, incomes, employment, fit)
+
+
+
 ##########################################
 ## Time-varying transition probabilities
 # Obtain probabilities from incidence, baseline mortality rates
@@ -128,9 +156,15 @@ pct_hpv$oropharyngeal <- c(
 )
 
 
-# Probability that HPV vaccination protects against cancer diagnosis
+# Probability that HPV vaccination protects against cancer diagnosis (compared to naive)
 vaccine_eff <- list()
-vaccine_eff$cervical
+# Cervical: https://www.nejm.org/doi/full/10.1056/NEJMoa1917338
+vaccine_eff$cervical <- c(shape1 = 0.773, shape2 = 7.787)
+# Oral: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0068329#s3
+vaccine_eff$oral <- c(shape1 = 0.981, shape2 = 7.770)
+# Other/genital: source from https://www.sciencedirect.com/science/article/pii/S0755498214004771#bib0165
+vaccine_eff$female_genital <- c(shape1 = 0.930, shape2 = 18.548)
+vaccine_eff$male_genital <- c(shape1 = 7.524, shape2 = 39.539)
 
 # Current rate of vaccine uptake
 # https://journals.sagepub.com/doi/full/10.1177/2158244014554961
@@ -144,7 +178,7 @@ discount <- 0.03
 
 # HPV vaccination costs
 # https://www.sciencedirect.com/science/article/pii/S0264410X21003212
-cost_vc <- 376
+cost_vc <- c(376)
 
 # Cost savings from pap smears averted (if done)
 # costs$pap <- 43 * (1 + discount)^(2024 - 2011)
