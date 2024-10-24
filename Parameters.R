@@ -1,5 +1,8 @@
 ### Model parameters
-source("./Read_data.R", print.eval = F)
+load("model_data.Rdata")
+
+library(rms)
+library(tidyverse)
 
 #########################################
 ## Income estimation
@@ -16,9 +19,9 @@ income <- do.call(cbind, predict(fit, x = seq(15, 84, 1))) |>
   select(-Total)
 
 # Fit check
-incomes |> ggplot(aes(x = Age, y = Total)) +
-  geom_line() +
-  geom_line(data = income, aes(x = Age, y = Monthly_income))
+# incomes |> ggplot(aes(x = Age, y = Total)) +
+#   geom_line() +
+#   geom_line(data = income, aes(x = Age, y = Monthly_income))
 
 # Merge employment with incomes to get an adjusted total income (annual)
 median_income <- employment |>
@@ -133,10 +136,6 @@ remove(probs, probs1, i, groupnames)
 
 
 
-
-
-
-
 # Probability of cancer attributable to HPV
 # https://onlinelibrary.wiley.com/doi/epdf/10.1002/ijc.30716
 pct_hpv <- list()
@@ -156,9 +155,6 @@ vaccine_eff$oral <- rbeta(iter, shape1 = 0.981, shape2 = 7.770)
 vaccine_eff$female_genital <- rbeta(iter, shape1 = 0.930, shape2 = 18.548)
 vaccine_eff$male_genital <- rbeta(iter, shape1 = 7.524, shape2 = 39.539)
 
-# Current rate of vaccine uptake
-# https://journals.sagepub.com/doi/full/10.1177/2158244014554961
-# pr_vaccinated_female <- rbeta(iter, shape1 = 28, shape2 = (208 - 26))
 
 ################################################
 

@@ -1,6 +1,6 @@
 library(vroom)
 library(tidyverse)
-library(rms)
+
 
 source("./Functions.R")
 
@@ -98,46 +98,46 @@ df_penile_mort <- vroom("./Data/hpv_penile_mort.csv", col_types = c(gender = "c"
 
 # Cancer-specific death rates
 death_rates <- rbind(
-  fn_cancer_mortality(
+  fn_incidence(
     "F",
     df_cervical_mort,
-    incidence_rates,
+    census,
     "Cervical"
   ),
-  fn_cancer_mortality(
+  fn_incidence(
     "F",
     df_vaginal_mort,
-    incidence_rates,
+    census,
     "Vaginal"
   ),
-  fn_cancer_mortality(
+  fn_incidence(
     "F",
     df_oropharyngeal_mort,
-    incidence_rates,
+    census,
     "Oropharyngeal"
   ),
-  fn_cancer_mortality(
+  fn_incidence(
     "F",
     df_anal_mort,
-    incidence_rates,
+    census,
     "Anal"
   ),
-  fn_cancer_mortality(
+  fn_incidence(
     "M",
     df_oropharyngeal_mort,
-    incidence_rates,
+    census,
     "Oropharyngeal"
   ),
-  fn_cancer_mortality(
+  fn_incidence(
     "M",
     df_anal_mort,
-    incidence_rates,
+    census,
     "Anal"
   ),
-  fn_cancer_mortality(
+  fn_incidence(
     "M",
     df_penile_mort,
-    incidence_rates,
+    census,
     "Penile"
   )
 )
@@ -148,7 +148,7 @@ remove(df_cervical_mort, df_vaginal_mort, df_oropharyngeal_mort, df_anal_mort, d
 # Merge the cancer-specific mortality numbers, subtract from the overall mortality numbers
 baseline_less_cancer <- death_rates |>
   group_by(Age, Group) |>
-  summarise(Deaths = sum(Deaths)) |>
+  summarise(Deaths = sum(N)) |>
   full_join(census) |>
   mutate(
     Deaths_adjusted = N_deaths - Deaths,
@@ -220,4 +220,4 @@ employment <- df_employment |>
 
 remove(df_employment)
 
-
+save.image(file = "model_data.Rdata")
