@@ -112,30 +112,6 @@ probabilities <- do.call(rbind, probs1)
 remove(probs, probs1, i, groupnames)
 
 
-
-
-# Currently unsure whether to add to model
-# Probabilities for routine screening from age 10 to 84
-# https://doi.org/10.1002/ijgo.12126
-# Pap smear every 3 years from 25 to 65
-# pap <- tibble(
-#   Group = "Pap smear (female)",
-#   Age = seq(10, 84, 1),
-#   Fit = case_when(
-#     Age >= 25 & Age < 65 ~ (1/3),
-#     .default = 0
-#   ),
-#   SE.fit = 0
-# )
-# probabilities <- bind_rows(probabilities, pap)
-# remove(pap)
-
-# Probability that pap smear requires follow-up colposcopy
-# https://doi.org/10.47102/annals-acadmedsg.2023329
-# pr_positive_pap <- c(Events = 292, Non_events = (10967 - 292))
-
-
-
 # Probability of cancer attributable to HPV
 # https://onlinelibrary.wiley.com/doi/epdf/10.1002/ijc.30716
 pct_hpv <- list()
@@ -171,6 +147,7 @@ cost_vc <- c(Bivalent = 123, Quadrivalent = 320, Nonavalent = 376)
 
 
 # Workforce participation due to cancers
+# https://jamanetwork.com/journals/jama/fullarticle/183387
 median_income <- median_income |>
   rowwise() |>
   mutate(
@@ -185,22 +162,16 @@ median_income <- median_income |>
 # Return to work following diagnosis
 # Assign as a wage decrement to median income (cancer)
 # Labour force participation (baseline) * monthly income * -leave duration (months)
+# https://doi.org/10.1002/pon.1820
+# transformation with https://aushsi.shinyapps.io/ShinyPrior/ to Gamma dists
+# reported in days so divide by 30.438
 
 rtw <- list()
+rtw$male_genital <- rgamma(iter, shape = 659.678, scale = 0.159)/30.438
+rtw$female_genital <- rgamma(iter, shape = 148.905, 1.088)/30.438
 
-# Female pelvic cancer RTW ~ 3.2 months
-# https://www.mdpi.com/2072-6694/14/9/2330
-# Used ShinyPrior to estimate Gamma dist based on 3.2 months median (range 0 - 33.1)
-# Roughly equivalent to Gamma dist with mean = 3.9 and SE = 3/sqrt(101)
-rtw$pelvic_female <- rgamma(iter, shape = 114.916, scale = 0.028)
-
-# Oropharyngeal cancer RTW
-# https://www.sciencedirect.com/science/article/pii/S0360301619337514
-# ShinyPrior: Mean 6.8 months, SE = 5.8/sqrt(58)
-rtw$oropharyngeal <- rgamma(iter, shape = 79.724, scale = 0.085)
-
-# Colorectal cancer RTW
-# https://academic.oup.com/bjs/article/107/1/140/6121017
-# Used ShinyPrior to estimate Gamma dist based on (95% CI 379, 467) days, n = 317
-# This is roughly equivalent to Gamma(93890.743,0.005)
-rtw$genital_daily <- rgamma(iter, shape = 93890.743, scale = 0.005)
+# Australian study on oropharyngeal cancer is the best current evidence
+# https://doi.org/10.1016/j.ijrobp.2019.09.001
+# Transformed with Shinyprior to Gamma dist using IQR
+# reported in months
+rtw$oropharyngeal <- rgamma(iter, shape = 2.456, scale = 3.069)

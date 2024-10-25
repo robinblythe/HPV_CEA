@@ -1,10 +1,11 @@
 options(scipen = 100, digits = 5)
-options(dplyr.summarise.inform = F)
 
 # Global model settings
-discount <- 0.03
-iter <- 10000
-Year <- 2019
+discount = 0.03
+iter = 10000
+age_start = 10
+age_end = 84
+model_year = 2019
 
 source("./Parameters.R", echo = F)
 
@@ -13,6 +14,6 @@ source("./Parameters.R", echo = F)
 # Four HPV-associated cancers in women: oropharyngeal, cervical, vaginal/vulval, and anal
 # Three model states: Healthy, Diagnosed, Dead
 
-n_male_10 <- population_age_10$Population[population_age_10$Group == "Male" & population_age_10$Year == Year]
-n_female_10 <- population_age_10$Population[population_age_10$Group == "Female" & population_age_10$Year == Year]
+n_male_10 <- population_age_10$Population[population_age_10$Group == "Male" & population_age_10$Year == model_year]
+n_female_10 <- population_age_10$Population[population_age_10$Group == "Female" & population_age_10$Year == model_year]
 

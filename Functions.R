@@ -45,22 +45,61 @@ tp_model <- function(df) {
   )
 }
 
+# Run the model
 run_sim <- function(gender, cancer_type, vaccine_type, n){
+  
+  browser()
+  
+  # Load relevant datasets
+  income <- median_income |>
+    filter(Sex == gender) |>
+    select(case_when(cancer_type == "oropharyngeal" ~ c("Age", "Weighted_income_annual", "Weighted_income_oro"),
+                     cancer_type != "oropharyngeal" & gender == "Female" ~ c("Age", "Weighted_income_annual", "Weighted_income_female_repro"),
+                     .default = c("Age", "Weighted_income_annual", "Weighted_income_other_cancer")))
+  
+  pct_hpv <- pct_hpv[[cancer_type]]
+  
+  pr_cancer <- probabilities |>
+    filter(grepl("incidence", probabilities$Group, ignore.case = T),
+           grepl(cancer_type, probabilities$Group, ignore.case = T),
+           case_when(cancer_type %in% c("oropharyngeal", "anal") ~ 
+                       grepl(gender, probabilities$Group, ignore.case = T),
+                     .default = TRUE))
+  
+  pr_cancer_mortality <- probabilities |>
+    filter(grepl("mortality", probabilities$Group, ignore.case = T),
+           grepl(cancer_type, probabilities$Group, ignore.case = T),
+           !grepl("Baseline", probabilities$Group, ignore.case = T),
+           case_when(cancer_type %in% c("oropharyngeal", "anal") ~ 
+                       grepl(gender, probabilities$Group, ignore.case = T),
+                     .default = TRUE))
+  
+  baseline_mortality <- probabilities |>
+    filter(grepl("Baseline", probabilities$Group, ignore.case = T),
+           grepl(gender, probabilities$Group, ignore.case = T))
+  
+  sick_leave <- case_when(
+    cancer_type == "oropharyngeal" ~ rtw$oropharyngeal,
+    cancer_type != "oropharyngeal" & gender == "Female" ~ rtw$female_genital,
+    cancer_type != "oropharyngeal" & gender == "Female" ~ rtw$male_genital
+  )
+
+# next step - check vaccine effectiveness
   
   # Initialise tibble with entry group
   df <- tibble(
+    Age = 10,
     Gender = gender,
     Cancer_type = cancer_type,
     Vaccine = vaccine_type,
-    Age = 10,
     Healthy = n,
     Cancer = 0,
     Dead = 0,
     Cost = case_when(
       vaccine_type == "None" ~ 0,
-      vaccine_type == "Bivalent" ~ n * cost_vc[[1]],
-      vaccine_type == "Quadrivalent" ~ n * cost_vc[[2]],
-      vaccine_type == "Nonavalent" ~ n * cost_vc[[3]]
+      vaccine_type == "Bivalent" ~ n * -cost_vc[[1]],
+      vaccine_type == "Quadrivalent" ~ n * -cost_vc[[2]],
+      vaccine_type == "Nonavalent" ~ n * -cost_vc[[3]]
     )
   )
   
