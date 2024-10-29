@@ -30,16 +30,86 @@ median_income <- employment |>
   replace(is.na(.), 0) |>
   arrange(Sex, Age)
 
+
 remove(income, incomes, employment, fit)
+
 
 
 ##########################################
 ## Time-varying transition probabilities
+# Obtain probabilities from incidence, baseline mortality rates
+probs <- list()
+groupnames <- list(
+  Baseline_mortality = c("Baseline mortality (female)", "Baseline mortality (male)"),
+  Incidence = c(
+    "Cervical cancer incidence",
+    "Vaginal/vulval cancer incidence",
+    "Oropharyngeal cancer incidence (female)",
+    "Oropharyngeal cancer incidence (male)",
+    "Anal cancer incidence (female)",
+    "Anal cancer incidence (male)",
+    "Penile cancer incidence"
+  ),
+  Cancer_mortality = c(
+    "Cervical cancer mortality",
+    "Vaginal/vulval cancer mortality",
+    "Oropharyngeal cancer mortality (female)",
+    "Oropharyngeal cancer mortality (male)",
+    "Anal cancer mortality (female)",
+    "Anal cancer mortality (male)",
+    "Penile cancer mortality"
+  )
+)
 
-baseline_mortality <- list()
-baseline_mortality$male <- subset(baseline_less_cancer, Group == "Male")
-baseline_mortality$female <- subset(baseline_less_cancer, Group == "Female")
-remove(baseline_less_cancer)
+# Baseline mortality, non-HPV related deaths
+baseline_mortality <- baseline_less_cancer |>
+  group_by(Group) |>
+  nest()
+models <- map(baseline_mortality$data, tp_model)
+
+for (i in 1:length(groupnames$Baseline_mortality)) {
+  probs[[i]] <- tibble(
+    Group = groupnames$Baseline_mortality[[i]],
+    Age = seq(10, 84, 1),
+    do.call(data.frame, predict(models[[i]], type = "response", se.fit = T)[1:2])
+  )
+}
+remove(baseline_mortality, baseline_less_cancer, models)
+
+# Cancer incidence
+cancer_rates <- incidence_rates |>
+  group_by(Group, Diagnosis) |>
+  nest()
+models <- map(cancer_rates$data, tp_model)
+
+for (i in 1:length(groupnames$Incidence)) {
+  probs[[i + 2]] <- tibble(
+    Group = groupnames$Incidence[[i]],
+    Age = seq(10, 84, 1),
+    do.call(data.frame, predict(models[[i]], type = "response", se.fit = T)[1:2])
+  )
+}
+remove(cancer_rates, incidence_rates, models)
+
+# Cancer mortality
+# Can use KM curves from the data request to get risk of death? No censoring
+cancer_deaths <- death_rates |>
+  group_by(Group, Diagnosis) |>
+  nest()
+models <- map(cancer_deaths$data, tp_model)
+
+for (i in 1:length(groupnames$Cancer_mortality)) {
+  probs[[i + 9]] <- tibble(
+    Group = groupnames$Cancer_mortality[[i]],
+    Age = seq(10, 84, 1),
+    do.call(data.frame, predict(models[[i]], type = "response", se.fit = T)[1:2])
+  )
+}
+remove(cancer_deaths, death_rates, models)
+
+probs1 <- lapply(probs, setNames, c("Group", "Age", "Fit", "SE.fit"))
+probabilities <- do.call(rbind, probs1)
+remove(probs, probs1, i, groupnames)
 
 
 # Probability of cancer attributable to HPV
