@@ -18,4 +18,5 @@ source("./Functions.R")
 n_male_10 <- population_age_10$Population[population_age_10$Group == "Male" & population_age_10$Year == model_year]
 n_female_10 <- population_age_10$Population[population_age_10$Group == "Female" & population_age_10$Year == model_year]
 
-run_sim(Gender = "Female", cancer_type = "oropharyngeal", Vaccine_type = "None", n = 20000)
+f_oro <- lapply(1:10000, 
+                function(x) run_sim(Gender = "Female", cancer_type = "oropharyngeal", Vaccine_type = "None", n = n_female_10))

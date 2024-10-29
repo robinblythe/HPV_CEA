@@ -44,12 +44,11 @@ tp_model <- function(df) {
   )
 }
 
-get_b <- function()
 
 # Run the model
 run_sim <- function(Gender, cancer_type, Vaccine_type, n) {
   
-  # Load relevant datasets
+  # Filter datasets
   income <- median_income |>
     filter(Sex == Gender) |>
     select(case_when(cancer_type == "oropharyngeal" ~ c("Age", "Weighted_income_annual", "Weighted_income_oro"),
@@ -78,6 +77,10 @@ run_sim <- function(Gender, cancer_type, Vaccine_type, n) {
           grepl(Gender, probabilities$Group, ignore.case = T),
         .default = TRUE
       )
+    ) |>
+    rowwise() |>
+    mutate(
+      Sample = rnorm(1, Fit, SE.fit)
     )
 
   pr_cancer_mortality <- probabilities |>
@@ -90,12 +93,20 @@ run_sim <- function(Gender, cancer_type, Vaccine_type, n) {
           grepl(Gender, probabilities$Group, ignore.case = T),
         .default = TRUE
       )
+    ) |>
+    rowwise() |>
+    mutate(
+      Sample = rnorm(1, Fit, SE.fit)
     )
 
   baseline_mortality <- probabilities |>
     filter(
       grepl("Baseline", probabilities$Group, ignore.case = T),
       grepl(Gender, probabilities$Group, ignore.case = T)
+    ) |>
+    rowwise() |>
+    mutate(
+      Sample = rnorm(1, Fit, SE.fit)
     )
 
   sick_leave <- case_when(
@@ -103,8 +114,7 @@ run_sim <- function(Gender, cancer_type, Vaccine_type, n) {
     cancer_type != "oropharyngeal" & Gender == "Female" ~ rtw$female_genital(),
     cancer_type != "oropharyngeal" & Gender == "Female" ~ rtw$male_genital()
   )
-
-  browser()
+  
 
   # Initialise tibble with entry group
   df <- tibble(
@@ -113,20 +123,41 @@ run_sim <- function(Gender, cancer_type, Vaccine_type, n) {
     Cancer_type = cancer_type, # column 3
     Vaccine = Vaccine_type, # column 4
     Healthy = n, # column 5
-    Cancer_diagnoses = 0, # column 6
-    Cancer_survivors = 0, # column 7
-    Dead = 0, # column 8
-    NMB = -cost_vc * n # column 9
+    Cancer = 0, # column 6
+    Dead = 0, # column 7
+    NMB = -cost_vc * n # column 8
   )
+  
 
   # Create for loop that adds a row each cycle based on previous row
   for (i in 1:74) {
-    df[(i+1), 1] <- age_start + i
-    df[(i+1), 2] <- Gender
-    df[(i+1), 3] <- cancer_type
-    df[(i+1), 4] <- Vaccine_type
-    # Cancer incidence and survivors
-    df[(i+1), 6] <- df[i,5] * rnorm(1, mean = pr_cancer$Fit[i], sd = pr_cancer$SE.fit[i]) * vaccine_eff * pct_hpv
-    df[(i+1)]
+    prev <- df[i,]
+    new <- tibble(
+      Age = age_start + i,
+      Gender = Gender,
+      Cancer_type = cancer_type,
+      Vaccine = Vaccine_type,
+      Cancer = (prev$Healthy * pr_cancer$Sample[i] * vaccine_eff * pct_hpv) + # Vaccine-preventable
+        (prev$Healthy * pr_cancer$Sample[i] * (1 - pct_hpv)) + # Non-vaccine-preventable
+        prev$Cancer, # Prior cancer cases
+      Dead = (prev$Healthy + prev$Cancer) * baseline_mortality$Sample[i] +
+        (prev$Healthy + prev$Cancer) * pr_cancer_mortality$Sample[i] * vaccine_eff * pct_hpv + # Vaccine-preventable
+        (prev$Healthy + prev$Cancer) * pr_cancer_mortality$Sample[i] * (1 - pct_hpv) + # Non-vaccine-preventable
+        prev$Dead
+    )
+    new$Healthy <- n - new$Cancer - new$Dead
+    new$NMB <- -(sick_leave/12) * income$Weighted_income_annual[i]*12 * # Sick leave decrement
+      ((prev$Healthy * pr_cancer$Sample[i] * vaccine_eff * pct_hpv) + # Vaccine-preventable sick leave
+      (prev$Healthy * pr_cancer$Sample[i] * (1 - pct_hpv))) + # Non-vaccine-preventable sick leave
+      new$Cancer * income$Weighted_income_oro[i]*12 + # Downweighted income from cancer patients/survivors
+      new$Healthy * income$Weighted_income_annual[i]*12 # Regular income from healthy population
+    
+    df <- bind_rows(df, new)
   }
+  
+  return(df)
+}
+
+run_sim_pois <- function(Gender, cancer_type, Vaccine_type, n){
+  
 }
