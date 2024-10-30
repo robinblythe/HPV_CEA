@@ -36,10 +36,19 @@ remove(income, incomes, employment, fit)
 ##########################################
 ## Time-varying transition probabilities
 
-baseline_mortality <- list()
-baseline_mortality$male <- subset(baseline_less_cancer, Group == "Male")
-baseline_mortality$female <- subset(baseline_less_cancer, Group == "Female")
-remove(baseline_less_cancer)
+# Number of patients entering model
+cases <- list()
+cases$female <- list()
+cases$male <- list()
+
+cases$female$cervical <- lapply(incidence$female$cervical$N, function(x) rpois(iter, x))
+cases$female$vaginal <- lapply(incidence$female$vaginal$N, function(x) rpois(iter, x))
+cases$female$anal <- lapply(incidence$female$anal$N, function(x) rpois(iter, x))
+cases$female$oropharyngeal <- lapply(incidence$female$oropharyngeal$N, function(x) rpois(iter, x))
+cases$male$vaginal <- lapply(incidence$male$penile$N, function(x) rpois(iter, x))
+cases$male$vaginal <- lapply(incidence$male$anal$N, function(x) rpois(iter, x))
+cases$male$vaginal <- lapply(incidence$male$oropharyngeal$N, function(x) rpois(iter, x))
+
 
 
 # Probability of cancer attributable to HPV

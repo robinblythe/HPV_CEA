@@ -1,7 +1,7 @@
 # Functions for analysis
 
 # Convert incidence to rate using census data
-fn_incidence <- function(Gender, data, census_data, dx_group) {
+fn_incidence <- function(Gender, data, dx_group) {
   data |>
     select(year, age, gender, Freq) |>
     filter(
@@ -28,20 +28,7 @@ fn_incidence <- function(Gender, data, census_data, dx_group) {
     unnest(Age) |>
     group_by(Age, Group, Diagnosis) |>
     summarise(N = mean(N)) |>
-    left_join(census_data) |>
-    mutate(
-      Rate = N / Pop_total
-    ) |>
-    select(Age, Group, Diagnosis, N, Rate)
-}
-
-
-# Fitting a quasibinomial glm quickly:
-tp_model <- function(df) {
-  glm(Rate ~ rcs(Age, 5),
-    family = "quasibinomial",
-    data = df
-  )
+    select(Age, Group, Diagnosis, N)
 }
 
 
@@ -158,6 +145,4 @@ run_sim <- function(Gender, cancer_type, Vaccine_type, n) {
   return(df)
 }
 
-run_sim_pois <- function(Gender, cancer_type, Vaccine_type, n){
-  
-}
+
