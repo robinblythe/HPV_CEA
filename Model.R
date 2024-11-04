@@ -7,8 +7,8 @@ age_start <- 10
 age_end <- 84
 model_year <- 2019
 
-source("./Parameters.R", echo = F)
 source("./Functions.R")
+source("./Parameters.R", echo = F)
 
 # Two separate cohorts: Male and female
 # Three HPV-associated cancers in men: oropharyngeal, penile, and anal

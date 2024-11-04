@@ -31,6 +31,13 @@ fn_incidence <- function(Gender, data, dx_group) {
     select(Age, Group, Diagnosis, N)
 }
 
+get_odds <- function(OR, p0){
+  p_odds = p0/(1 - p0)
+  o = p_odds*OR
+  p1 = o/(1 + o)
+  return(p1)
+}
+
 # Get lifetime expected income for each group
 get_lifetime_income <- function(data, age, income, gender) {
   data |>

@@ -32,6 +32,22 @@ median_income <- employment |>
 
 remove(income, incomes, employment, fit)
 
+# Workforce participation due to cancers
+# https://jamanetwork.com/journals/jama/fullarticle/183387
+# Using odds from Figure 2 (cancer employed/unemployed / no cancer employed/unemployed)
+
+# need to figure out how to sample from these get_odds functions
+median_income <- median_income |>
+  rowwise() |>
+  mutate(
+    Participation_rate_female_repro = ifelse(Sex == "Female", get_odds((671/648)/(816/506), Participation_rate), NA_real_),
+    Participation_rate_oro = get_odds((75/62)/(116/26), Participation_rate),
+    Participation_rate_other_cancer = get_odds((13480/6886)/(133588/24015), Participation_rate),
+    Weighted_income_female_repro = Participation_rate_female_repro * Monthly_income * 12,
+    Weighted_income_oro = Participation_rate_oro * Monthly_income * 12,
+    Weighted_income_other_cancer = Participation_rate_other_cancer * Monthly_income * 12
+  )
+
 
 ##########################################
 ## Time-varying transition probabilities
@@ -85,18 +101,7 @@ cost_vc <- c(None = 0, Bivalent = 123, Quadrivalent = 320, Nonavalent = 376)
 # Intending to calculate cancer cost savings?
 
 
-# Workforce participation due to cancers
-# https://jamanetwork.com/journals/jama/fullarticle/183387
-median_income <- median_income |>
-  rowwise() |>
-  mutate(
-    Participation_rate_female_repro = ifelse(Sex == "Female", Participation_rate / 1.37 / 1.28, NA_real_),
-    Participation_rate_oro = Participation_rate / 1.37 / 2.47,
-    Participation_rate_other_cancer = Participation_rate / 1.37,
-    Weighted_income_female_repro = Participation_rate_female_repro * Monthly_income * 12,
-    Weighted_income_oro = Participation_rate_oro * Monthly_income * 12,
-    Weighted_income_other_cancer = Participation_rate_other_cancer * Monthly_income * 12
-  )
+
 
 # Summarise as expected lifetime income for each age
 lifetime_income <- list()

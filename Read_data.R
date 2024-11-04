@@ -178,6 +178,6 @@ employment <- df_employment |>
     Participation_rate = rep(0, 10)
   ))
 
-remove(df_employment)
+remove(df_employment, fn_incidence, get_lifetime_income, run_sim)
 
 save.image(file = "model_data.Rdata")
