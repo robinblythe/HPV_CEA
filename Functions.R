@@ -31,118 +31,46 @@ fn_incidence <- function(Gender, data, dx_group) {
     select(Age, Group, Diagnosis, N)
 }
 
-
-# Run the model
-run_sim <- function(Gender, cancer_type, Vaccine_type, n) {
-  
-  # Filter datasets
-  income <- median_income |>
-    filter(Sex == Gender) |>
-    select(case_when(cancer_type == "oropharyngeal" ~ c("Age", "Weighted_income_annual", "Weighted_income_oro"),
-      cancer_type != "oropharyngeal" & Gender == "Female" ~ c("Age", "Weighted_income_annual", "Weighted_income_female_repro"),
-      .default = c("Age", "Weighted_income_annual", "Weighted_income_other_cancer")
-    ))
-
-  pct_hpv <- ifelse(Vaccine_type == "None", 1, pct_hpv[[cancer_type]]())
-
-  vaccine_eff <- if (Vaccine_type == "None") {
-    1
-    } else if (cancer_type == "anal") {
-    ifelse(Gender == "Male", vaccine_eff$anal_male(), vaccine_eff$anal_female())
-  } else {
-    vaccine_eff[[cancer_type]]()
-  }
-
-  cost_vc <- cost_vc[[Vaccine_type]]
-
-  pr_cancer <- probabilities |>
+# Get lifetime expected income for each group
+get_lifetime_income <- function(data, age, income, gender) {
+  data |>
     filter(
-      grepl("incidence", probabilities$Group, ignore.case = T),
-      grepl(cancer_type, probabilities$Group, ignore.case = T),
-      case_when(
-        cancer_type %in% c("oropharyngeal", "anal") ~
-          grepl(Gender, probabilities$Group, ignore.case = T),
-        .default = TRUE
-      )
+      Age >= age,
+      Sex == gender
     ) |>
     rowwise() |>
-    mutate(
-      Sample = rnorm(1, Fit, SE.fit)
-    )
-
-  pr_cancer_mortality <- probabilities |>
-    filter(
-      grepl("mortality", probabilities$Group, ignore.case = T),
-      grepl(cancer_type, probabilities$Group, ignore.case = T),
-      !grepl("Baseline", probabilities$Group, ignore.case = T),
-      case_when(
-        cancer_type %in% c("oropharyngeal", "anal") ~
-          grepl(Gender, probabilities$Group, ignore.case = T),
-        .default = TRUE
-      )
-    ) |>
-    rowwise() |>
-    mutate(
-      Sample = rnorm(1, Fit, SE.fit)
-    )
-
-  baseline_mortality <- probabilities |>
-    filter(
-      grepl("Baseline", probabilities$Group, ignore.case = T),
-      grepl(Gender, probabilities$Group, ignore.case = T)
-    ) |>
-    rowwise() |>
-    mutate(
-      Sample = rnorm(1, Fit, SE.fit)
-    )
-
-  sick_leave <- case_when(
-    cancer_type == "oropharyngeal" ~ rtw$oropharyngeal(),
-    cancer_type != "oropharyngeal" & Gender == "Female" ~ rtw$female_genital(),
-    cancer_type != "oropharyngeal" & Gender == "Female" ~ rtw$male_genital()
-  )
-  
-
-  # Initialise tibble with entry group
-  df <- tibble(
-    Age = age_start, # column 1
-    Gender = Gender, # column 2
-    Cancer_type = cancer_type, # column 3
-    Vaccine = Vaccine_type, # column 4
-    Healthy = n, # column 5
-    Cancer = 0, # column 6
-    Dead = 0, # column 7
-    NMB = -cost_vc * n # column 8
-  )
-  
-
-  # Create for loop that adds a row each cycle based on previous row
-  for (i in 1:74) {
-    prev <- df[i,]
-    new <- tibble(
-      Age = age_start + i,
-      Gender = Gender,
-      Cancer_type = cancer_type,
-      Vaccine = Vaccine_type,
-      Cancer = (prev$Healthy * pr_cancer$Sample[i] * vaccine_eff * pct_hpv) + # Vaccine-preventable
-        (prev$Healthy * pr_cancer$Sample[i] * (1 - pct_hpv)) + # Non-vaccine-preventable
-        prev$Cancer, # Prior cancer cases
-      Dead = (prev$Healthy + prev$Cancer) * baseline_mortality$Sample[i] +
-        (prev$Healthy + prev$Cancer) * pr_cancer_mortality$Sample[i] * vaccine_eff * pct_hpv + # Vaccine-preventable
-        (prev$Healthy + prev$Cancer) * pr_cancer_mortality$Sample[i] * (1 - pct_hpv) + # Non-vaccine-preventable
-        prev$Dead
-    )
-    new$Healthy <- n - new$Cancer - new$Dead
-    new$NMB <- -(sick_leave/12) * income$Weighted_income_annual[i]*12 * # Sick leave decrement
-      ((prev$Healthy * pr_cancer$Sample[i] * vaccine_eff * pct_hpv) + # Vaccine-preventable sick leave
-      (prev$Healthy * pr_cancer$Sample[i] * (1 - pct_hpv))) + # Non-vaccine-preventable sick leave
-      new$Cancer * income$Weighted_income_oro[i]*12 + # Downweighted income from cancer patients/survivors
-      new$Healthy * income$Weighted_income_annual[i]*12 # Regular income from healthy population
-    
-    df <- bind_rows(df, new)
-  }
-  
-  return(df)
+    mutate(discounted_income = get({{ income }}) / (1 + discount)^row_number()) |>
+    group_by(Sex) |>
+    summarise(lifetime_income = sum(discounted_income)) |>
+    select(-Sex) |>
+    pull()
 }
 
 
+# Sim function
+run_sim <- function(cancer_type, gender) {
+  tibble(
+    Diagnosis = cancer_type,
+    Gender = gender,
+    Diagnosis_age = seq(age_start, age_end, 1),
+    Treatment_duration_months = case_when(
+      gender == "Male" & cancer_type != "Oropharyngeal cancer" ~ rtw$male_genital(),
+      gender == "Female" & cancer_type != "Oropharyngeal cancer" ~ rtw$female_genital(),
+      .default = rtw$oropharyngeal()
+    )
+  ) |>
+    rowwise() |>
+    mutate(
+      Income_healthy = lifetime_income[[tolower(gender)]]$healthy[[Diagnosis_age - 9]],
+      Income_cancer = case_when(
+        gender == "Female" & cancer_type == "Reproductive cancer" ~ lifetime_income$female$repro[[Diagnosis_age - 9]],
+        gender == "Female" & cancer_type == "Anal cancer" ~ lifetime_income$female$other[[Diagnosis_age - 9]],
+        gender == "Female" & cancer_type == "Oropharyngeal cancer" ~ lifetime_income$female$oro[[Diagnosis_age - 9]],
+        gender == "Male" & cancer_type == "Oropharyngeal cancer" ~ lifetime_income$male$oro[[Diagnosis_age - 9]],
+        .default = lifetime_income$male$other[[Diagnosis_age - 9]]
+      ),
+      Sick_leave_decrement = Treatment_duration_months / 12 * -median_income$Weighted_income_annual[median_income$Age == Diagnosis_age & median_income$Sex == gender],
+      Expected_income = pmax(Income_cancer + Sick_leave_decrement, 0),
+      Lost_income = Income_healthy - Expected_income
+    )
+}

@@ -19,43 +19,43 @@ incidence$female$cervical <- fn_incidence(
   "F",
   df_cervical,
   "Cervical"
-  )
+)
 
 incidence$female$vaginal <- fn_incidence(
-    "F",
-    df_vaginal,
-    "Vaginal"
-  )
+  "F",
+  df_vaginal,
+  "Vaginal"
+)
 
 incidence$female$oropharyngeal <- fn_incidence(
-    "F",
-    df_oropharyngeal,
-    "Oropharyngeal"
-  )
+  "F",
+  df_oropharyngeal,
+  "Oropharyngeal"
+)
 
 incidence$female$anal <- fn_incidence(
-    "F",
-    df_anal,
-    "Anal"
-  )
+  "F",
+  df_anal,
+  "Anal"
+)
 
 incidence$male$oropharyngeal <- fn_incidence(
-    "M",
-    df_oropharyngeal,
-    "Oropharyngeal"
-  )
+  "M",
+  df_oropharyngeal,
+  "Oropharyngeal"
+)
 
 incidence$male$anal <- fn_incidence(
   "M",
-    df_anal,
-    "Anal"
-  )
+  df_anal,
+  "Anal"
+)
 
 incidence$male$penile <- fn_incidence(
-    "M",
-    df_penile,
-    "Penile"
-  )
+  "M",
+  df_penile,
+  "Penile"
+)
 
 
 remove(df_cervical, df_vaginal, df_oropharyngeal, df_anal, df_penile)
@@ -73,46 +73,46 @@ mortality$female <- list()
 mortality$male <- list()
 
 mortality$female$cervical <- fn_incidence(
-    "F",
-    df_cervical_mort,
-    "Cervical"
-  )
+  "F",
+  df_cervical_mort,
+  "Cervical"
+)
 
 mortality$female$vaginal <- fn_incidence(
-    "F",
-    df_vaginal_mort,
-    "Vaginal"
-  )
+  "F",
+  df_vaginal_mort,
+  "Vaginal"
+)
 
 mortality$female$oropharyngeal <- fn_incidence(
-    "F",
-    df_oropharyngeal_mort,
-    "Oropharyngeal"
-  )
+  "F",
+  df_oropharyngeal_mort,
+  "Oropharyngeal"
+)
 
 mortality$female$anal <- fn_incidence(
-    "F",
-    df_anal_mort,
-    "Anal"
-  )
+  "F",
+  df_anal_mort,
+  "Anal"
+)
 
 mortality$male$oropharyngeal <- fn_incidence(
-    "M",
-    df_oropharyngeal_mort,
-    "Oropharyngeal"
-  )
+  "M",
+  df_oropharyngeal_mort,
+  "Oropharyngeal"
+)
 
 mortality$male$anal <- fn_incidence(
-    "M",
-    df_anal_mort,
-    "Anal"
-  )
+  "M",
+  df_anal_mort,
+  "Anal"
+)
 
 mortality$male$penile <- fn_incidence(
-    "M",
-    df_penile_mort,
-    "Penile"
-  )
+  "M",
+  df_penile_mort,
+  "Penile"
+)
 
 
 remove(df_cervical_mort, df_vaginal_mort, df_oropharyngeal_mort, df_anal_mort, df_penile_mort)

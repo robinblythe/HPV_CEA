@@ -55,20 +55,20 @@ cases$male$vaginal <- lapply(incidence$male$oropharyngeal$N, function(x) rpois(i
 # https://onlinelibrary.wiley.com/doi/epdf/10.1002/ijc.30716
 pct_hpv <- list()
 pct_hpv$cervical <- 1
-pct_hpv$anal <- function() rbeta(1, shape1 = 35000, shape2 = 5000)
-pct_hpv$vaginal <- function() rbeta(1, shape1 = (8500 + 12000), shape2 = ((34000 - 8500) + (15000 - 12000)))
-pct_hpv$penile <- function() rbeta(1, shape1 = 13000, shape2 = 26000)
-pct_hpv$oropharyngeal <- function() rbeta(1, shape1 = 29000, shape2 = (96000 - 29000))
+pct_hpv$anal <- rbeta(iter, shape1 = 35000, shape2 = 5000)
+pct_hpv$vaginal <- rbeta(iter, shape1 = (8500 + 12000), shape2 = ((34000 - 8500) + (15000 - 12000)))
+pct_hpv$penile <- rbeta(iter, shape1 = 13000, shape2 = 26000)
+pct_hpv$oropharyngeal <- rbeta(iter, shape1 = 29000, shape2 = (96000 - 29000))
 
 # Probability that HPV vaccination protects against cancer diagnosis (compared to naive)
 vaccine_eff <- list()
 # Cervical BIVALENT: https://www.nejm.org/doi/full/10.1056/NEJMoa1917338
-vaccine_eff$cervical <- function() rbeta(1, shape1 = 0.773, shape2 = 7.787)
+vaccine_eff$cervical <- rbeta(iter, shape1 = 0.773, shape2 = 7.787)
 # Oral BIVALENT: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0068329#s3
-vaccine_eff$oropharyngeal <- function() rbeta(1, shape1 = 0.981, shape2 = 7.770)
+vaccine_eff$oropharyngeal <- rbeta(iter, shape1 = 0.981, shape2 = 7.770)
 # Other/genital BIVALENT: https://www.sciencedirect.com/science/article/pii/S0755498214004771#bib0165
-vaccine_eff$vaginal <- vaccine_eff$anal_female <- function() rbeta(1, shape1 = 0.930, shape2 = 18.548)
-vaccine_eff$penile <- vaccine_eff$anal_male <- function() rbeta(1, shape1 = 7.524, shape2 = 39.539)
+vaccine_eff$vaginal <- vaccine_eff$anal_female <- rbeta(iter, shape1 = 0.930, shape2 = 18.548)
+vaccine_eff$penile <- vaccine_eff$anal_male <- rbeta(iter, shape1 = 7.524, shape2 = 39.539)
 
 
 ################################################
@@ -97,6 +97,44 @@ median_income <- median_income |>
     Weighted_income_oro = Participation_rate_oro * Monthly_income * 12,
     Weighted_income_other_cancer = Participation_rate_other_cancer * Monthly_income * 12
   )
+
+# Summarise as expected lifetime income for each age
+lifetime_income <- list()
+lifetime_income$male <- list()
+lifetime_income$female <- list()
+
+# Healthy - no disability from cancer
+lifetime_income$male$healthy <- sapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_annual", gender = "Male")
+)
+lifetime_income$female$healthy <- sapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_annual", gender = "Female")
+)
+
+# Including cancer disability
+lifetime_income$male$oro <- sapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_oro", gender = "Male")
+)
+lifetime_income$male$other <- sapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_other_cancer", gender = "Male")
+)
+lifetime_income$female$oro <- sapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_oro", gender = "Female")
+)
+lifetime_income$female$repro <- sapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_female_repro", gender = "Female")
+)
+lifetime_income$female$other <- sapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_other_cancer", gender = "Female")
+)
+
 
 # Return to work following diagnosis
 # Assign as a wage decrement to median income (cancer)
