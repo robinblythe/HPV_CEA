@@ -180,4 +180,32 @@ employment <- df_employment |>
 
 remove(df_employment, fn_incidence, get_lifetime_income, run_sim)
 
+#########################################
+## Income estimation
+# Estimate median wage across the workforce to generate senior incomes:
+# Spar term chosen by visual analysis to create a smoothed quadratic curve
+fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
+incomes <- do.call(cbind, predict(fit, x = seq(15, 84, 1))) |>
+  as_tibble() |>
+  rename(
+    Age = x,
+    Total = y
+  ) |>
+  mutate(Monthly_income = ifelse(Total < 0, 0, Total)) |>
+  select(-Total)
+
+# Fit check
+# incomes |> ggplot(aes(x = Age, y = Total)) +
+#   geom_line() +
+#   geom_line(data = income, aes(x = Age, y = Monthly_income))
+
+# Merge employment with incomes to get an adjusted total income (annual)
+median_income <- employment |>
+  left_join(incomes, by = join_by(Age)) |>
+  mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12) %>%
+  replace(is.na(.), 0) |>
+  arrange(Sex, Age)
+
+remove(incomes, employment, fit)
+
 save.image(file = "model_data.Rdata")

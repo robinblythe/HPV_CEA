@@ -4,66 +4,113 @@ load("model_data.Rdata")
 library(rms)
 library(tidyverse)
 
-#########################################
-## Income estimation
-# Estimate median wage across the workforce to generate senior incomes:
-# Spar term chosen by visual analysis to create a smoothed quadratic curve
-fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
-income <- do.call(cbind, predict(fit, x = seq(15, 84, 1))) |>
-  as_tibble() |>
-  rename(
-    Age = x,
-    Total = y
-  ) |>
-  mutate(Monthly_income = ifelse(Total < 0, 0, Total)) |>
-  select(-Total)
-
-# Fit check
-# incomes |> ggplot(aes(x = Age, y = Total)) +
-#   geom_line() +
-#   geom_line(data = income, aes(x = Age, y = Monthly_income))
-
-# Merge employment with incomes to get an adjusted total income (annual)
-median_income <- employment |>
-  left_join(income, by = join_by(Age)) |>
-  mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12) %>%
-  replace(is.na(.), 0) |>
-  arrange(Sex, Age)
-
-remove(income, incomes, employment, fit)
+set.seed(888)
 
 # Workforce participation due to cancers
 # https://jamanetwork.com/journals/jama/fullarticle/183387
 # Using odds from Figure 2 (cancer employed/unemployed / no cancer employed/unemployed)
+sim_incomes <- list()
+for (i in 1:iter) {
+  sim_incomes[[i]] <- median_income |>
+    mutate(
+      Participation_rate_female_repro = ifelse(Sex == "Female",
+        get_odds(1 / (1 - rbeta(1, 671, 648)) / (1 / (1 - rbeta(1, 816, 506))), Participation_rate),
+        NA_real_
+      ),
+      Participation_rate_oro = get_odds(1 / (1 - rbeta(1, 75, 62)) / (1 / (1 - rbeta(1, 116, 26))), Participation_rate),
+      Participation_rate_other_cancer = get_odds(1 / (1 - rbeta(1, 13480, 6886)) / (1 / (1 - rbeta(1, 133588, 24015))), Participation_rate),
+      Weighted_annual_female_repro = Participation_rate_female_repro * Monthly_income * 12,
+      Weighted_annual_oro = Participation_rate_oro * Monthly_income * 12,
+      Weighted_annual_other = Participation_rate_other_cancer * Monthly_income * 12,
+      iteration = i
+    )
+}
+sim_incomes <- do.call(rbind, sim_incomes)
 
-# need to figure out how to sample from these get_odds functions
-median_income <- median_income |>
-  rowwise() |>
+################################################
+# Summarise as expected lifetime income for each age
+# lifetime_income <- list()
+# lifetime_income$male <- list()
+# lifetime_income$female <- list()
+#
+# Healthy - no disability from cancer
+lifetime_income$male$healthy <- lapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_annual", gender = "Male", i = iteration)
+)
+
+lifetime_income$female$healthy <- lapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_annual", gender = "Female", i = iteration)
+)
+
+# Including cancer disability
+lifetime_income$male$oro <- lapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_annual_oro", gender = "Male", i = iteration)
+)
+
+lifetime_income$male$other <- lapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_annual_other", gender = "Male", i = iteration)
+)
+
+lifetime_income$female$oro <- lapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_annual_oro", gender = "Female", i = iteration)
+)
+
+lifetime_income$female$repro <- lapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_annual_female_repro", gender = "Female", i = iteration)
+)
+
+lifetime_income$female$other <- lapply(
+  seq(age_start, age_end, 1),
+  function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_annual_other", gender = "Female", i = iteration)
+)
+
+saveRDS(lifetime_income, file = "./income_sims.RDS")
+lifetime_income <- readRDS("./income_sims.RDS")
+
+# Return to work following diagnosis
+# Assign as a wage decrement to median income (cancer)
+# Labour force participation (baseline) * monthly income * -leave duration (months)
+# https://doi.org/10.1002/pon.1820
+# transformation with https://aushsi.shinyapps.io/ShinyPrior/ to Gamma dists
+# reported in days so divide by 30.438
+
+rtw <- list()
+rtw$male_genital <- rgamma(iter, shape = 659.678, scale = 0.159) / 30.438
+rtw$female_genital <- rgamma(iter, shape = 148.905, 1.088) / 30.438
+
+# Australian study on oropharyngeal cancer is the best current evidence
+# https://doi.org/10.1016/j.ijrobp.2019.09.001
+# Transformed with Shinyprior to Gamma dist using IQR
+# reported in months
+rtw$oropharyngeal <- rgamma(iter, shape = 2.456, scale = 3.069)
+
+###############################
+# Incidence and mortality data
+probabilities <- bind_rows(
+  do.call(rbind, incidence$female),
+  do.call(rbind, incidence$male)
+) |>
+  rename(N_cases = N) |>
+  left_join(
+    bind_rows(
+      do.call(rbind, mortality$female),
+      do.call(rbind, mortality$male)
+    ),
+    by = join_by(Age, Group, Diagnosis)
+  ) |>
+  rename(N_deaths = N) |>
+  group_by(Group, Diagnosis) |>
   mutate(
-    Participation_rate_female_repro = ifelse(Sex == "Female", get_odds((671/648)/(816/506), Participation_rate), NA_real_),
-    Participation_rate_oro = get_odds((75/62)/(116/26), Participation_rate),
-    Participation_rate_other_cancer = get_odds((13480/6886)/(133588/24015), Participation_rate),
-    Weighted_income_female_repro = Participation_rate_female_repro * Monthly_income * 12,
-    Weighted_income_oro = Participation_rate_oro * Monthly_income * 12,
-    Weighted_income_other_cancer = Participation_rate_other_cancer * Monthly_income * 12
-  )
-
-
-##########################################
-## Time-varying transition probabilities
-
-# Number of patients entering model
-cases <- list()
-cases$female <- list()
-cases$male <- list()
-
-cases$female$cervical <- lapply(incidence$female$cervical$N, function(x) rpois(iter, x))
-cases$female$vaginal <- lapply(incidence$female$vaginal$N, function(x) rpois(iter, x))
-cases$female$anal <- lapply(incidence$female$anal$N, function(x) rpois(iter, x))
-cases$female$oropharyngeal <- lapply(incidence$female$oropharyngeal$N, function(x) rpois(iter, x))
-cases$male$vaginal <- lapply(incidence$male$penile$N, function(x) rpois(iter, x))
-cases$male$vaginal <- lapply(incidence$male$anal$N, function(x) rpois(iter, x))
-cases$male$vaginal <- lapply(incidence$male$oropharyngeal$N, function(x) rpois(iter, x))
+    Cumulative_cases = cumsum(N_cases),
+    Pr_mortality = list(rbeta(iter, N_deaths, (Cumulative_cases - N_deaths)))
+  ) |>
+  ungroup()
 
 
 
@@ -87,73 +134,13 @@ vaccine_eff$vaginal <- vaccine_eff$anal_female <- rbeta(iter, shape1 = 0.930, sh
 vaccine_eff$penile <- vaccine_eff$anal_male <- rbeta(iter, shape1 = 7.524, shape2 = 39.539)
 
 
-################################################
-
 ## Costs
 
 # HPV vaccination costs
 # https://www.sciencedirect.com/science/article/pii/S0264410X21003212
-cost_vc <- c(None = 0, Bivalent = 123, Quadrivalent = 320, Nonavalent = 376)
+cost_vc <- 123
 
 # Cost savings from pap smears averted (if done)
 # costs$pap <- 43 * (1 + discount)^(2024 - 2011)
 # costs$colposcopy <- 109.73 * (1 + discount)^(2024 - 2011)
 # Intending to calculate cancer cost savings?
-
-
-
-
-# Summarise as expected lifetime income for each age
-lifetime_income <- list()
-lifetime_income$male <- list()
-lifetime_income$female <- list()
-
-# Healthy - no disability from cancer
-lifetime_income$male$healthy <- sapply(
-  seq(age_start, age_end, 1),
-  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_annual", gender = "Male")
-)
-lifetime_income$female$healthy <- sapply(
-  seq(age_start, age_end, 1),
-  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_annual", gender = "Female")
-)
-
-# Including cancer disability
-lifetime_income$male$oro <- sapply(
-  seq(age_start, age_end, 1),
-  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_oro", gender = "Male")
-)
-lifetime_income$male$other <- sapply(
-  seq(age_start, age_end, 1),
-  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_other_cancer", gender = "Male")
-)
-lifetime_income$female$oro <- sapply(
-  seq(age_start, age_end, 1),
-  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_oro", gender = "Female")
-)
-lifetime_income$female$repro <- sapply(
-  seq(age_start, age_end, 1),
-  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_female_repro", gender = "Female")
-)
-lifetime_income$female$other <- sapply(
-  seq(age_start, age_end, 1),
-  function(x) get_lifetime_income(median_income, age = x, income = "Weighted_income_other_cancer", gender = "Female")
-)
-
-
-# Return to work following diagnosis
-# Assign as a wage decrement to median income (cancer)
-# Labour force participation (baseline) * monthly income * -leave duration (months)
-# https://doi.org/10.1002/pon.1820
-# transformation with https://aushsi.shinyapps.io/ShinyPrior/ to Gamma dists
-# reported in days so divide by 30.438
-
-rtw <- list()
-rtw$male_genital <- function() rgamma(1, shape = 659.678, scale = 0.159) / 30.438
-rtw$female_genital <- function() rgamma(1, shape = 148.905, 1.088) / 30.438
-
-# Australian study on oropharyngeal cancer is the best current evidence
-# https://doi.org/10.1016/j.ijrobp.2019.09.001
-# Transformed with Shinyprior to Gamma dist using IQR
-# reported in months
-rtw$oropharyngeal <- function() rgamma(1, shape = 2.456, scale = 3.069)
