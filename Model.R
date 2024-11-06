@@ -3,11 +3,13 @@ load("model_data.Rdata")
 
 library(rms)
 library(tidyverse)
+library(foreach)
+library(doParallel)
 
 set.seed(888)
 
 discount <- 0.03
-iter <- 10
+iter <- 1000
 age_start <- 10
 age_end <- 84
 model_year <- 2019
@@ -21,7 +23,7 @@ run_model_loop <- function(cancer_type, gender) {
       filter(Sex == gender) |>
       mutate(
         Participation_rate =
-          if (gender == "Female" & cancer_type %in% c("cervical", "vaginal")) {
+          if (gender == "Female" & cancer_type == "reproductive") {
             get_odds(1 / (1 - rbeta(1, 671, 648)) / (1 / (1 - rbeta(1, 816, 506))), Participation_rate)
           } else if (cancer_type == "oropharyngeal") {
             get_odds(1 / (1 - rbeta(1, 75, 62)) / (1 / (1 - rbeta(1, 116, 26))), Participation_rate)
@@ -50,23 +52,21 @@ run_model_loop <- function(cancer_type, gender) {
       rgamma(1, shape = 148.905, 1.088) / 30.438
     }
     
-    browser()
-    
-    # Stop here for now - the mortality probabilities are way off. Need to fix them first.
-
-    probabilities <- incidence[[tolower(gender)]][[cancer_type]] |>
-      rename(N_cases = N) |>
-      left_join(mortality[[tolower(gender)]][[cancer_type]],
-        by = join_by(Age, Group, Diagnosis)
-      ) |>
-      ungroup() |>
-      rename(N_deaths = N) |>
-      mutate(Cumulative_cases = cumsum(N_cases)) |>
-      rowwise() |>
-      mutate(Pr_mortality = rbeta(1, N_deaths, (Cumulative_cases - N_deaths)),
-             Pr_mortality = ifelse(N_deaths == 0 & (Cumulative_cases - N_deaths == 0), 0, Pr_mortality))
+    # Don't use right now - need to find a way to incorporate probabilities in the final outcome
+    # probabilities <- incidence[[tolower(gender)]][[cancer_type]] |>
+    #   rename(N_cases = N) |>
+    #   left_join(mortality[[tolower(gender)]][[cancer_type]],
+    #     by = join_by(Age, Group, Diagnosis)
+    #   ) |>
+    #   ungroup() |>
+    #   rename(N_deaths = N) |>
+    #   mutate(Cumulative_cases = cumsum(N_cases)) |>
+    #   rowwise() |>
+    #   mutate(Pr_mortality = rbeta(1, N_deaths, (Cumulative_cases - N_deaths)),
+    #          Pr_mortality = ifelse(N_deaths == 0 & (Cumulative_cases - N_deaths == 0), 0, Pr_mortality))
     
     sims[[i]] <- tibble(
+      Iteration = i,
       Diagnosis = cancer_type,
       Gender = gender,
       Diagnosis_age = seq(age_start, age_end, 1),
@@ -80,46 +80,38 @@ run_model_loop <- function(cancer_type, gender) {
         Lost_income = Income_healthy - Expected_income
       )
   }
-  return(sims)
+  return(do.call(rbind, sims))
 }
 
-sims <- run_model_loop("oropharyngeal", "Female")
+# Prep parallel compute
+cores = detectCores() - 2
+cl <- makeCluster(cores)
+registerDoParallel(cl)
 
+sims <- list()
+cancers <- c("oropharyngeal", "oropharyngeal", "reproductive", "other HPV cancers")
+genders <- c("Female", "Male", "Female", "Male")
 
+sims <- foreach(i = 1:4, .packages = "dplyr") %dopar% {
+  run_model_loop(cancers[i], genders[i])
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+results <- do.call(rbind, sims)
 
 
 # Viz
-p <- results |>
+summary <- results |>
   group_by(Diagnosis, Gender, Diagnosis_age) |>
   summarise(
-    Lost_income_mean = mean(Lost_income),
+    Lost_income_median = median(Lost_income),
     Lost_income_low = quantile(Lost_income, 0.025),
     Lost_income_high = quantile(Lost_income, 0.975)
-  ) |>
+  ) 
+
+p <- summary |>
   ggplot(aes(
     x = Diagnosis_age,
-    y = Lost_income_mean,
+    y = Lost_income_median,
     ymin = Lost_income_low,
     ymax = Lost_income_high
   ))
@@ -129,3 +121,8 @@ p +
   geom_ribbon(fill = "grey", alpha = 0.5) +
   facet_wrap(vars(Gender, Diagnosis)) +
   theme_bw()
+
+models <- summary |>
+  group_by(Diagnosis, Gender) |>
+  nest() |>
+  mutate(model = map(data, function(df) lm(Lost_income_median ~ Diagnosis_age, data = df)))
