@@ -54,35 +54,3 @@ get_lifetime_income <- function(data, age, income, gender) {
     ungroup() |>
     pull()
 }
-
-
-run_sim <- function(cancer_type, gender) {
-  sims <- list()
-  for (i in 1:iter) {
-    sims[[i]] <- tibble(
-      Diagnosis = cancer_type,
-      Gender = gender,
-      Diagnosis_age = seq(age_start, age_end, 1),
-      Treatment_duration_months = case_when(
-        gender == "Male" & cancer_type != "Oropharyngeal cancer" ~ rtw$male_genital[[i]],
-        gender == "Female" & cancer_type != "Oropharyngeal cancer" ~ rtw$female_genital[[i]],
-        .default = rtw$oropharyngeal[[i]]
-      )
-    ) |>
-      rowwise() |>
-      mutate(
-        Income_healthy = lifetime_income[[tolower(gender)]]$healthy[[Diagnosis_age - 9]][[i]],
-        Income_cancer = case_when(
-          gender == "Female" & cancer_type == "Reproductive cancer" ~ lifetime_income$female$repro[[Diagnosis_age - 9]][[i]],
-          gender == "Female" & cancer_type == "Anal cancer" ~ lifetime_income$female$other[[Diagnosis_age - 9]][[i]],
-          gender == "Female" & cancer_type == "Oropharyngeal cancer" ~ lifetime_income$female$oro[[Diagnosis_age - 9]][[i]],
-          gender == "Male" & cancer_type == "Oropharyngeal cancer" ~ lifetime_income$male$oro[[Diagnosis_age - 9]][[i]],
-          .default = lifetime_income$male$other[[Diagnosis_age - 9]][[i]]
-        ),
-        Sick_leave_decrement = Treatment_duration_months / 12 * -median_income$Weighted_income_annual[median_income$Age == Diagnosis_age & median_income$Sex == gender],
-        Expected_income = Income_cancer + Sick_leave_decrement,
-        Lost_income = Income_healthy - Expected_income
-      )
-  }
-  return(sims)
-}
