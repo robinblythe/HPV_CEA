@@ -129,7 +129,7 @@ vaccine_eff <- list()
 vaccine_eff$cervical <- rbeta(iter, shape1 = 0.773, shape2 = 7.787)
 # Oral BIVALENT: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0068329#s3
 vaccine_eff$oropharyngeal <- rbeta(iter, shape1 = 0.981, shape2 = 7.770)
-# Other/genital BIVALENT: https://www.sciencedirect.com/science/article/pii/S0755498214004771#bib0165
+# Other/genital BIVALENT: https://www.sciencedirect.com/science/article/pii/S0755498214004771
 vaccine_eff$vaginal <- vaccine_eff$anal_female <- rbeta(iter, shape1 = 0.930, shape2 = 18.548)
 vaccine_eff$penile <- vaccine_eff$anal_male <- rbeta(iter, shape1 = 7.524, shape2 = 39.539)
 

@@ -12,46 +12,46 @@ df_penile <- vroom("./Data/hpv_penile.csv", col_types = c(gender = "c"), show_co
 
 # Create incidence dataset with census-defined denominators for rates
 incidence <- list()
-incidence$female <- list()
-incidence$male <- list()
+incidence$Female <- list()
+incidence$Male <- list()
 
-incidence$female$cervical <- fn_incidence(
+incidence$Female$Cervical <- fn_incidence(
   "F",
   df_cervical,
   "Cervical"
 )
 
-incidence$female$vaginal <- fn_incidence(
+incidence$Female$Vaginal <- fn_incidence(
   "F",
   df_vaginal,
   "Vaginal"
 )
 
-incidence$female$oropharyngeal <- fn_incidence(
+incidence$Female$Oropharyngeal <- fn_incidence(
   "F",
   df_oropharyngeal,
   "Oropharyngeal"
 )
 
-incidence$female$anal <- fn_incidence(
+incidence$Female$Anal <- fn_incidence(
   "F",
   df_anal,
   "Anal"
 )
 
-incidence$male$oropharyngeal <- fn_incidence(
+incidence$Male$Oropharyngeal <- fn_incidence(
   "M",
   df_oropharyngeal,
   "Oropharyngeal"
 )
 
-incidence$male$anal <- fn_incidence(
+incidence$Male$Anal <- fn_incidence(
   "M",
   df_anal,
   "Anal"
 )
 
-incidence$male$penile <- fn_incidence(
+incidence$Male$Penile <- fn_incidence(
   "M",
   df_penile,
   "Penile"
@@ -69,46 +69,46 @@ df_penile_mort <- vroom("./Data/hpv_penile_mort.csv", col_types = c(gender = "c"
 
 # Cancer-specific death rates
 mortality <- list()
-mortality$female <- list()
-mortality$male <- list()
+mortality$Female <- list()
+mortality$Male <- list()
 
-mortality$female$cervical <- fn_incidence(
+mortality$Female$Cervical <- fn_incidence(
   "F",
   df_cervical_mort,
   "Cervical"
 )
 
-mortality$female$vaginal <- fn_incidence(
+mortality$Female$Vaginal <- fn_incidence(
   "F",
   df_vaginal_mort,
   "Vaginal"
 )
 
-mortality$female$oropharyngeal <- fn_incidence(
+mortality$Female$Oropharyngeal <- fn_incidence(
   "F",
   df_oropharyngeal_mort,
   "Oropharyngeal"
 )
 
-mortality$female$anal <- fn_incidence(
+mortality$Female$Anal <- fn_incidence(
   "F",
   df_anal_mort,
   "Anal"
 )
 
-mortality$male$oropharyngeal <- fn_incidence(
+mortality$Male$Oropharyngeal <- fn_incidence(
   "M",
   df_oropharyngeal_mort,
   "Oropharyngeal"
 )
 
-mortality$male$anal <- fn_incidence(
+mortality$Male$Anal <- fn_incidence(
   "M",
   df_anal_mort,
   "Anal"
 )
 
-mortality$male$penile <- fn_incidence(
+mortality$Male$Penile <- fn_incidence(
   "M",
   df_penile_mort,
   "Penile"
@@ -119,15 +119,30 @@ remove(df_cervical_mort, df_vaginal_mort, df_oropharyngeal_mort, df_anal_mort, d
 
 # Population of 10-year-olds for model start condition
 df_census <- vroom("./Data/population_by_age.csv", show_col_types = F)
-population_age_10 <- df_census |>
-  rename(Group = Gender) |>
-  filter(Age == "10 Year") |>
-  mutate(across(c(where(is.character), -c(Age, Group)), as.numeric)) |>
-  pivot_longer(!c(Age, Group), names_to = "Year", values_to = "Population") |>
-  select(-Age) |>
-  mutate(Year = as.numeric(Year))
+census <- df_census |>
+  select(Age, Gender, `2019`) |>
+  rename(Pop_total = `2019`,
+         Group = Gender) |>
+  mutate(Age = as.numeric(substr(Age, 1, 2)))
 
-remove(df_census)
+probabilities <- bind_rows(
+  do.call(rbind, incidence$Female),
+  do.call(rbind, incidence$Male)
+) |>
+  rename(N_cases = N) |>
+  left_join(
+    bind_rows(
+      do.call(rbind, mortality$Female),
+      do.call(rbind, mortality$Male)
+    ),
+    by = join_by(Age, Group, Diagnosis)
+  ) |>
+  rename(N_deaths = N) |>
+  left_join(census, by = join_by(Age, Group)) |>
+  mutate(Pr_cancer = N_cases / Pop_total) |>
+  ungroup()
+
+remove(df_census, incidence, mortality)
 
 # Median income by age group
 df_median_income <- vroom("./Data/Median_income_by_age.csv", delim = ",", show_col_types = F)
@@ -176,9 +191,10 @@ employment <- df_employment |>
     Age = rep(seq(10, 14, 1), 2),
     Sex = c(rep("Male", 5), rep("Female", 5)),
     Participation_rate = rep(0, 10)
-  ))
+  ),
+  by = join_by(Age, Sex, Participation_rate))
 
-remove(df_employment, fn_incidence, get_lifetime_income, run_sim)
+remove(df_employment, fn_incidence, get_lifetime_income)
 
 #########################################
 ## Income estimation
@@ -208,4 +224,4 @@ median_income <- employment |>
 
 remove(incomes, employment, fit)
 
-save.image(file = "model_data.Rdata")
+save(census, median_income, probabilities, file = "model_data.Rdata")

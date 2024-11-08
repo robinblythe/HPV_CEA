@@ -13,21 +13,22 @@ iter <- 1000
 age_start <- 10
 age_end <- 84
 model_year <- 2019
+cost_vc <- 123
 
 source("./Functions.R")
 
 
 # Prep parallel compute
-cores = detectCores() - 2
+cores <- detectCores() - 2
 cl <- makeCluster(cores)
 registerDoParallel(cl)
 
 sims <- list()
-cancers <- c("oropharyngeal", "oropharyngeal", "reproductive", "other HPV cancers")
-genders <- c("Female", "Male", "Female", "Male")
+cancers <- c("Oropharyngeal", "Oropharyngeal", "Reproductive", "Anal/genital")
+sexes <- c("Female", "Male", "Female", "Male")
 
 sims <- foreach(i = 1:4, .packages = "dplyr") %dopar% {
-  run_model_loop(cancers[i], genders[i])
+  run_model_loop(cancers[i], sexes[i])
 }
 
 results <- do.call(rbind, sims)
@@ -40,7 +41,7 @@ summary <- results |>
     Lost_income_median = median(Lost_income),
     Lost_income_low = quantile(Lost_income, 0.025),
     Lost_income_high = quantile(Lost_income, 0.975)
-  ) 
+  )
 
 p <- summary |>
   ggplot(aes(
