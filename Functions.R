@@ -123,7 +123,7 @@ run_model_loop <- function(cancer_type, gender) {
     )
       
     incidence <- probabilities |>
-      select(Age, Group, Diagnosis, Pr_cancer) |>
+      select(Age, Group, Diagnosis, N_cases, Pop_total) |>
       filter(Group == gender,
              Diagnosis == cancer_type) |>
       rowwise() |>
