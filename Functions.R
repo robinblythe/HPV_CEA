@@ -59,6 +59,9 @@ get_lifetime_income <- function(data, age, income, gender) {
 
 run_model_loop <- function(cancer_type, gender) {
   sims <- list()
+  
+  # Workforce participation due to cancers
+  # https://jamanetwork.com/journals/jama/fullarticle/183387
   for (i in 1:iter) {
     sim_incomes <- median_income |>
       filter(Sex == gender) |>
@@ -85,6 +88,12 @@ run_model_loop <- function(cancer_type, gender) {
       function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_cancer", gender = gender)
     )
     
+    # Return to work following diagnosis
+    # Assign as a wage decrement to median income (cancer)
+    # Labour force participation (baseline) * monthly income * -leave duration (months)
+    # https://doi.org/10.1002/pon.1820
+    # transformation with https://aushsi.shinyapps.io/ShinyPrior/ to Gamma dists
+    # reported in days so divide by 30.438
     rtw <- if (cancer_type == "oropharyngeal") {
       rgamma(1, shape = 2.456, scale = 3.069)
     } else if (gender == "Male") {
@@ -117,8 +126,8 @@ run_model_loop <- function(cancer_type, gender) {
         Income_healthy = lifetime_income$healthy[[Diagnosis_age - 9]],
         Income_cancer = lifetime_income$cancer[[Diagnosis_age - 9]],
         Sick_leave_decrement = rtw / 12 * -median_income$Weighted_income_annual[median_income$Age == Diagnosis_age & median_income$Sex == gender],
-        Expected_income = Income_cancer + Sick_leave_decrement,
-        Lost_income = Income_healthy - Expected_income
+        Adjusted_income_cancer = Income_cancer + Sick_leave_decrement,
+        Lost_income = Income_healthy - Adjusted_income_cancer
       )
   }
   return(do.call(rbind, sims))
