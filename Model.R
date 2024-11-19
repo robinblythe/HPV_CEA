@@ -55,7 +55,14 @@ p +
   geom_line() +
   geom_ribbon(fill = "grey", alpha = 0.5) +
   facet_wrap(vars(Gender, Diagnosis)) +
-  theme_bw()
+  theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  scale_y_continuous(breaks = seq(0, 800000, 100000),
+                     name = "Lost income per cancer survivor (2024 SGD)", 
+                     label = scales::comma)
+
+ggsave(file = "prelim_findings.png", height = 8, width = 8)
+
 
 models <- summary |>
   group_by(Diagnosis, Gender) |>
