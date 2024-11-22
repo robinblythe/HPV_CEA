@@ -129,6 +129,13 @@ run_model_loop <- function(cancer_type, gender) {
       rowwise() |>
       mutate(Pr_cancer = rbeta(1, N_cases, (Pop_total - N_cases)))
     
+    # Note that another requirement for the model is income lost due to (all-cause) mortality; can't speculate whether cancer caused death
+    # Should reflect that mortality after diagnosis can occur in any year, so need the average survivorship after diagnosis by age
+    # Can model this with a Poisson distribution, or do a survival model with age at diagnosis as a covariate
+    # If the latter, use the Kalbfleisch-Prentice estimator to get median survival time at each age for each gender and cancer
+    # Turn this into mean age at death = Diagnosis_age + years of cancer survivorship
+    # Then the decrement = -lifetime_income$cancer[[Diagnosis_age + years_survived - 9]] (minus 9 needed for indexing)
+    
     sims[[i]] <- tibble(
       Iteration = i,
       Diagnosis = cancer_type,
