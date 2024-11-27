@@ -125,6 +125,8 @@ census <- df_census |>
          Group = Gender) |>
   mutate(Age = as.numeric(substr(Age, 1, 2)))
 
+# Need to get median years survived by age, gender, and type of cancer - add this to the probabilities tibble
+
 probabilities <- bind_rows(
   do.call(rbind, incidence$Female),
   do.call(rbind, incidence$Male)
