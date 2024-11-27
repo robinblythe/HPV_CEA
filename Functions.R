@@ -66,6 +66,8 @@ run_model_loop <- function(cancer_type, gender) {
 
   for (i in 1:iter) {
     
+    browser()
+    
     # https://jamanetwork.com/journals/jama/fullarticle/183387
     sim_incomes <- median_income |>
       filter(Sex == gender) |>
@@ -103,37 +105,39 @@ run_model_loop <- function(cancer_type, gender) {
     
     # Percent of cancer attributable to HPV
     # https://onlinelibrary.wiley.com/doi/epdf/10.1002/ijc.30716
-    pct_hpv <- case_when(
-      cancer_type == "Cervical" ~ 1,
-      cancer_type == "Anal" ~ rbeta(1, shape1 = 35000, shape2 = 5000),
-      cancer_type == "Vaginal" ~ rbeta(1, shape1 = (8500 + 12000), shape2 = ((34000 - 8500) + (15000 - 12000))),
-      cancer_type == "Penile" ~ rbeta(1, shape1 = 13000, shape2 = 26000),
-      cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 29000, shape2 = (96000 - 29000))
-    )
-    
-    # Probability that HPV vaccination protects against cancer diagnosis (compared to naive)
-    vaccine_eff <- case_when(
-      # Cervical BIVALENT: https://www.nejm.org/doi/full/10.1056/NEJMoa1917338
-      cancer_type == "Cervical" ~ rbeta(1, shape1 = 0.773, shape2 = 7.787),
-      # Oral BIVALENT: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0068329#s3
-      cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 0.981, shape2 = 7.770),
-      # Other/genital BIVALENT: https://www.sciencedirect.com/science/article/pii/S0755498214004771
-      cancer_type == "Vaginal" | (cancer_type == "Anal" & gender == "Female") ~ rbeta(1, shape1 = 0.930, shape2 = 18.548),
-      cancer_type == "Penile" | (cancer_type == "Anal" & gender == "Male") ~ rbeta(1, shape1 = 7.524, shape2 = 39.539)
-    )
-      
-    incidence <- probabilities |>
-      select(Age, Group, Diagnosis, N_cases, Pop_total) |>
-      filter(Group == gender,
-             Diagnosis == cancer_type) |>
-      rowwise() |>
-      mutate(Pr_cancer = rbeta(1, N_cases, (Pop_total - N_cases)))
+    # pct_hpv <- case_when(
+    #   cancer_type == "Cervical" ~ 1,
+    #   cancer_type == "Anal" ~ rbeta(1, shape1 = 35000, shape2 = 5000),
+    #   cancer_type == "Vaginal" ~ rbeta(1, shape1 = (8500 + 12000), shape2 = ((34000 - 8500) + (15000 - 12000))),
+    #   cancer_type == "Penile" ~ rbeta(1, shape1 = 13000, shape2 = 26000),
+    #   cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 29000, shape2 = (96000 - 29000))
+    # )
+    # 
+    # # Probability that HPV vaccination protects against cancer diagnosis (compared to naive)
+    # vaccine_eff <- case_when(
+    #   # Cervical BIVALENT: https://www.nejm.org/doi/full/10.1056/NEJMoa1917338
+    #   cancer_type == "Cervical" ~ rbeta(1, shape1 = 0.773, shape2 = 7.787),
+    #   # Oral BIVALENT: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0068329#s3
+    #   cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 0.981, shape2 = 7.770),
+    #   # Other/genital BIVALENT: https://www.sciencedirect.com/science/article/pii/S0755498214004771
+    #   cancer_type == "Vaginal" | (cancer_type == "Anal" & gender == "Female") ~ rbeta(1, shape1 = 0.930, shape2 = 18.548),
+    #   cancer_type == "Penile" | (cancer_type == "Anal" & gender == "Male") ~ rbeta(1, shape1 = 7.524, shape2 = 39.539)
+    # )
+    #   
+    # incidence <- probabilities |>
+    #   select(Age, Group, Diagnosis, N_cases, Pop_total) |>
+    #   filter(Group == gender,
+    #          Diagnosis == cancer_type) |>
+    #   rowwise() |>
+    #   mutate(Pr_cancer = rbeta(1, N_cases, (Pop_total - N_cases)))
     
     sims[[i]] <- tibble(
       Iteration = i,
       Diagnosis = cancer_type,
       Gender = gender,
       Diagnosis_age = seq(age_start, age_end, 1),
+      Participation_rate_cancer_by_age = sim_incomes$Participation_rate_cancer,
+      Weighted_income_cancer_by_age = sim_incomes$Weighted_income_cancer
     ) |>
       rowwise() |>
       mutate(

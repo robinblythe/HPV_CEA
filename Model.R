@@ -32,7 +32,10 @@ sims <- foreach(i = 1:4, .packages = "dplyr") %dopar% {
 }
 
 results <- do.call(rbind, sims)
+saveRDS(results, file = "simulation_results.rds", compress = FALSE)
 
+#############################
+results <- read_rds(file = "simulation_results.rds")
 
 # Viz
 summary <- results |>
@@ -68,3 +71,24 @@ models <- summary |>
   group_by(Diagnosis, Gender) |>
   nest() |>
   mutate(model = map(data, function(df) lm(Lost_income_median ~ Diagnosis_age, data = df)))
+
+results_summary <- models |>
+  mutate(Annual_loss = model[[row_number()]]$coefficients[[2]]) |>
+  select(Diagnosis, Gender, Annual_loss)
+
+p_check <- oro |>
+  ggplot(aes(x = Diagnosis_age, colour = Gender))
+
+p_check +
+  geom_line(aes(y = Income_healthy, linetype = "Income healthy")) +
+  geom_line(aes(y = Income_cancer, linetype = "Income cancer")) +
+  scale_linetype_manual(values = c("Income healthy" = "solid", "Income cancer" = "dashed")) +
+  theme_bw()
+
+p_check +
+  geom_line(aes(y = Participation_rate_cancer_by_age)) +
+  theme_bw()
+
+# Interesting result here - women have higher net income losses than men
+# Reason being - in Singapore, women have greater labour force participation than men in the early career stage
+# Therefore they lose out more with an early diagnosis
