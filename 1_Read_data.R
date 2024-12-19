@@ -1,7 +1,7 @@
 library(vroom)
 library(tidyverse)
 
-source("./Functions.R")
+source("./0_Functions.R")
 
 # Read in incidence data
 df_cervical <- vroom("./Data/hpv_cervical.csv", col_types = c(gender = "c"), show_col_types = F)
@@ -125,8 +125,7 @@ census <- df_census |>
          Group = Gender) |>
   mutate(Age = as.numeric(substr(Age, 1, 2)))
 
-# Need to get median years survived by age, gender, and type of cancer - add this to the probabilities tibble
-
+# Probabilities by age, sex, cancer
 probabilities <- bind_rows(
   do.call(rbind, incidence$Female),
   do.call(rbind, incidence$Male)
@@ -145,6 +144,26 @@ probabilities <- bind_rows(
   ungroup()
 
 remove(df_census, incidence, mortality)
+
+# Baseline mortality
+baseline_mortality <- vroom("./Data/census_deaths.csv") |>
+  rowwise() |>
+  mutate(
+    start_age = substr(Age, 1, 2),
+    end_age = substr(Age, 6, 7),
+    Age = list(seq(start_age, end_age, 1))
+  ) |>
+  unnest(Age) |>
+  select(Age, Group, Rate_per_1000) |>
+  mutate(Mort_rate = Rate_per_1000/1000)
+
+# Smooth out the predictions with a quasibinomial model
+baseline_mortality <- baseline_mortality |>
+  mutate(Pr_death = predict(glm(Mort_rate ~ Age + Group, family = quasibinomial), type = "response")) |>
+  select(Age, Group, Pr_death)
+
+probabilities <- left_join(probabilities, baseline_mortality)
+remove(baseline_mortality)
 
 # Median income by age group
 df_median_income <- vroom("./Data/Median_income_by_age.csv", delim = ",", show_col_types = F)

@@ -41,20 +41,18 @@ get_odds <- function(OR, p0) {
 
 
 # Get lifetime expected income for each group
-get_lifetime_income <- function(data, age, gender) {
-  
+get_lifetime_income <- function(data, age, income, gender) {
   data |>
     filter(
       Age >= age,
       Sex == gender
     ) |>
     rowwise() |>
-    mutate(discounted_income_healthy = Weighted_income_annual / (1 + discount)^row_number(),
-           discounted_income_cancer = Weighted_income_cancer / (1 + discount)^row_number()) |>
+    mutate(discounted_income = get({{ income }}) / (1 + discount)^row_number()) |>
     group_by(Sex) |>
-    summarise(lifetime_income_healthy = sum(discounted_income_healthy),
-              lifetime_income_cancer = sum(discounted_income_cancer)) |>
-    ungroup()
+    summarise(lifetime_income = sum(discounted_income)) |>
+    ungroup() |>
+    pull()
 }
 
 
@@ -67,6 +65,8 @@ run_model_loop <- function(cancer_type, gender) {
   # https://jamanetwork.com/journals/jama/fullarticle/183387
 
   for (i in 1:iter) {
+    
+    browser()
     
     # https://jamanetwork.com/journals/jama/fullarticle/183387
     sim_incomes <- median_income |>
@@ -83,9 +83,15 @@ run_model_loop <- function(cancer_type, gender) {
         Weighted_income_cancer = Participation_rate_cancer * Monthly_income * 12
       )
     
-    lifetime_income <- lapply(
+    lifetime_income <- list()
+    lifetime_income$healthy <- lapply(
       seq(age_start, age_end, 1),
-      function(x) get_lifetime_income(sim_incomes, age = x, gender = gender)
+      function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_annual", gender = gender)
+    )
+    
+    lifetime_income$cancer <- lapply(
+      seq(age_start, age_end, 1),
+      function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_cancer", gender = gender)
     )
     
     # https://doi.org/10.1002/pon.1820
@@ -117,6 +123,13 @@ run_model_loop <- function(cancer_type, gender) {
     #   cancer_type == "Vaginal" | (cancer_type == "Anal" & gender == "Female") ~ rbeta(1, shape1 = 0.930, shape2 = 18.548),
     #   cancer_type == "Penile" | (cancer_type == "Anal" & gender == "Male") ~ rbeta(1, shape1 = 7.524, shape2 = 39.539)
     # )
+    #   
+    # incidence <- probabilities |>
+    #   select(Age, Group, Diagnosis, N_cases, Pop_total) |>
+    #   filter(Group == gender,
+    #          Diagnosis == cancer_type) |>
+    #   rowwise() |>
+    #   mutate(Pr_cancer = rbeta(1, N_cases, (Pop_total - N_cases)))
     
     # Note that another requirement for the model is income lost due to (all-cause) mortality; can't speculate whether cancer caused death
     # Should reflect that mortality after diagnosis can occur in any year, so need the average survivorship after diagnosis by age
@@ -124,8 +137,6 @@ run_model_loop <- function(cancer_type, gender) {
     # If the latter, use the Kalbfleisch-Prentice estimator to get median survival time at each age for each gender and cancer
     # Turn this into mean age at death = Diagnosis_age + years of cancer survivorship
     # Then the decrement = -lifetime_income$cancer[[Diagnosis_age + years_survived - 9]] (minus 9 needed for indexing)
-    
-    browser()
     
     sims[[i]] <- tibble(
       Iteration = i,
@@ -137,8 +148,8 @@ run_model_loop <- function(cancer_type, gender) {
     ) |>
       rowwise() |>
       mutate(
-        Income_healthy = lifetime_income[[Diagnosis_age - 9]]$lifetime_income_healthy,
-        Income_cancer = lifetime_income[[Diagnosis_age - 9]]$lifetime_income_cancer,
+        Income_healthy = lifetime_income$healthy[[Diagnosis_age - 9]],
+        Income_cancer = lifetime_income$cancer[[Diagnosis_age - 9]],
         Sick_leave_decrement = rtw / 12 * -median_income$Weighted_income_annual[median_income$Age == Diagnosis_age & median_income$Sex == gender],
         Adjusted_income_cancer = Income_cancer + Sick_leave_decrement,
         Lost_income = Income_healthy - Adjusted_income_cancer
