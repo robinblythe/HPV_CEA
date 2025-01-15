@@ -38,14 +38,17 @@ saveRDS(results, file = "simulation_results.rds", compress = FALSE)
 #############################
 results <- read_rds(file = "simulation_results.rds")
 
-# Viz
+# Explaining results
 summary <- results |>
   group_by(Diagnosis, Gender, Diagnosis_age) |>
   summarise(
-    Lost_income_median = median(Lost_income),
-    Lost_income_low = quantile(Lost_income, 0.025),
-    Lost_income_high = quantile(Lost_income, 0.975)
+    Lost_income_median = median(Lost_income_cancer),
+    Lost_income_low = quantile(Lost_income_cancer, 0.025),
+    Lost_income_high = quantile(Lost_income_cancer, 0.975)
   )
+
+dd <- datadist(summary); options(datadist = "dd")
+fit <- ols(Lost_income_median ~ rcs(Diagnosis_age, 5) * Gender, data = subset(summary, Diagnosis != "Oropharyngeal"))
 
 p <- summary |>
   ggplot(aes(
@@ -56,13 +59,11 @@ p <- summary |>
   ))
 
 p +
-  geom_line() +
-  geom_ribbon(fill = "grey", alpha = 0.5) +
+  geom_smooth() +
   facet_wrap(vars(Gender, Diagnosis)) +
   theme_bw() +
   theme(panel.grid.minor = element_blank()) +
-  scale_y_continuous(breaks = seq(0, 800000, 100000),
-                     name = "Lost income per cancer survivor (2024 SGD)", 
+  scale_y_continuous(name = "Lost income per cancer survivor (2024 SGD)", 
                      label = scales::comma)
 
 ggsave(file = "prelim_findings.png", height = 8, width = 8)
