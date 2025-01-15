@@ -12,7 +12,7 @@ discount <- 0.03
 iter <- 1000
 age_start <- 10
 age_end <- 84
-model_year <- 2019
+model_year <- 2025
 cost_vc <- 123
 
 source("./0_Functions.R")
@@ -24,10 +24,11 @@ cl <- makeCluster(cores)
 registerDoParallel(cl)
 
 sims <- list()
-cancers <- c("Oropharyngeal", "Oropharyngeal", "Reproductive", "Anal/genital")
-sexes <- c("Female", "Male", "Female", "Male")
+cancers = c("Oropharyngeal", "Cervical", "Vulval", "Vaginal", "Anal",
+            "Oropharyngeal", "Penile", "Anal")
+sexes = c(rep("Female", 5), rep("Male", 3))
 
-sims <- foreach(i = 1:4, .packages = "dplyr") %dopar% {
+sims <- foreach(i = 1:length(cancers), .packages = "dplyr") %dopar% {
   run_model_loop(cancers[i], sexes[i])
 }
 

@@ -159,11 +159,30 @@ baseline_mortality <- vroom("./Data/census_deaths.csv") |>
 
 # Smooth out the predictions with a quasibinomial model
 baseline_mortality <- baseline_mortality |>
-  mutate(Pr_death = predict(glm(Mort_rate ~ Age + Group, family = quasibinomial), type = "response")) |>
-  select(Age, Group, Pr_death)
+  mutate(p_baseline_mort = predict(glm(Mort_rate ~ Age + Group, family = quasibinomial), type = "response")) |>
+  select(Age, Group, p_baseline_mort)
 
 probabilities <- left_join(probabilities, baseline_mortality)
 remove(baseline_mortality)
+
+# Add cause-specific mortality rates
+cancer_mortality <- vroom("./Data/mortality_predictions_cancer.csv") |>
+  filter(age_at_diagnosis + survival_time < 85) |>
+  mutate(Age = age_at_diagnosis,
+         Group = ifelse(gender == "F", "Female", "Male"),
+         Diagnosis = case_when(
+           cancer_type == "Cervix" ~ "Cervical",
+           cancer_type == "Anus/Anal canal" ~ "Anal",
+           cancer_type == "Penis" ~ "Penile",
+           cancer_type == "Oropharynx" ~ "Oropharyngeal",
+           cancer_type == "Vagina" ~ "Vaginal",
+           cancer_type == "Vulva" ~ "Vulval"
+         )) |>
+  select(Age, Group, Diagnosis, survival_time, p_survival)
+
+# Don't want to keep anything except cancer-specific and baseline mortality for model - can change later if needed
+probabilities <- left_join(cancer_mortality, probabilities) |>
+  select(Age, Group, Diagnosis, survival_time, p_survival, p_baseline_mort)
 
 # Median income by age group
 df_median_income <- vroom("./Data/Median_income_by_age.csv", delim = ",", show_col_types = F)
@@ -245,4 +264,4 @@ median_income <- employment |>
 
 remove(incomes, employment, fit)
 
-save(census, median_income, probabilities, file = "model_data.Rdata")
+save(median_income, probabilities, file = "model_data.Rdata")
