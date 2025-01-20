@@ -1,36 +1,4 @@
 # Functions for analysis
-
-# Convert incidence to rate using census data
-fn_incidence <- function(Gender, data, dx_group) {
-  data |>
-    select(year, age, gender, Freq) |>
-    filter(
-      !(age %in% c("<10", ">85")),
-      gender == Gender
-    ) |>
-    rowwise() |>
-    mutate(
-      start_year = as.integer(substr(year, 1, 4)),
-      end_year = as.integer(substr(year, 6, 9)),
-      Year = list(seq(start_year, end_year, 1)),
-      Freq = as.integer(ifelse(Freq == -99, runif(1, 1, 4), Freq)) / (end_year - start_year + 1),
-      Diagnosis = dx_group,
-      Group = ifelse(gender == "F", "Female", "Male")
-    ) |>
-    unnest(Year) |>
-    rowwise() |>
-    mutate(
-      start_age = as.integer(substr(age, 1, 2)),
-      end_age = as.integer(substr(age, 4, 5)),
-      Age = list(seq(start_age, end_age, 1)),
-      N = Freq / (end_age - start_age + 1)
-    ) |>
-    unnest(Age) |>
-    group_by(Age, Group, Diagnosis) |>
-    summarise(N = mean(N)) |>
-    select(Age, Group, Diagnosis, N)
-}
-
 get_odds <- function(OR, p0) {
   p_odds <- p0 / (1 - p0)
   o <- p_odds * OR
@@ -55,6 +23,11 @@ get_lifetime_income <- function(data, age, income, gender) {
     pull()
 }
 
+est_beta <- function(p, se){
+  alpha <- (p * (1 - p)) / (se^2) - p
+  beta <- alpha * (1 - p) / p
+  return(c(alpha, beta))
+}
 
 
 run_model_loop <- function(cancer_type, gender) {
@@ -94,19 +67,10 @@ run_model_loop <- function(cancer_type, gender) {
       function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_cancer", gender = gender)
     )
     
-    # Mortality adjustment:
-    # Two ways to get additional decrement due to mortality
-    # Should reflect that mortality after diagnosis can occur in any year, so need the average survivorship after diagnosis by age
-    # Can model this with a Poisson distribution, or do a survival model with age at diagnosis as a covariate
-    # If the latter, can use the Kalbfleisch-Prentice estimator to get median survival time at each age for each gender and cancer
-    # Turn this into mean age at death = Diagnosis_age + years of cancer survivorship
-    # Then the decrement = -lifetime_income$cancer[[Diagnosis_age + years_survived - 9]] (minus 9 needed for indexing)
-    # Alternative approach using probabilities, given difficulties in above method:
-    # Obtain annual survivorship = S and 1 - S = annual cancer-specific mortality
-    # Obtain sum of lifetime cancer income * (1 - S) for each length of time survived for each age of diagnosis
-    # Subtract this sum as a mortality decrement
+    browser()
     
-    mort_adj <- probabilities |>
+    # Mortality adjustment
+    mort_adj <- cancer_mortality |>
       filter(Group == gender,
              Diagnosis == cancer_type) |>
       # Need the remaining income from age + survival time to get foregone income
@@ -119,12 +83,30 @@ run_model_loop <- function(cancer_type, gender) {
           ),
         by = join_by(join_age == Age)
       ) |>
-      mutate(annual_decrement = income_cancer * (1 - p_survival)) |>
+      rowwise() |>
+      mutate(beta_params = list(est_beta(p_survival, se_survival)),
+             alpha = beta_params[[1]],
+             beta = beta_params[[2]],
+             surv_prob = rbeta(1, alpha, beta),
+             annual_decrement = income_cancer * (1 - surv_prob)) |>
+      ungroup() |>
       group_by(Age) |>
       summarise(mort_decrement = sum(annual_decrement))
     
     # Add back in the cut-off 84 y/o remainder
     mort_adj[nrow(mort_adj) + 1, ] = list(84, 0)
+    
+    # Rate of cancer diagnoses in the population
+    cancer_rate <- cancer_incidence |>
+      filter(Group == gender,
+             Diagnosis == cancer_type) |>
+      rowwise() |>
+      mutate(beta_params = list(est_beta(pred_rate, se_pred_rate)),
+             alpha = beta_params[[1]],
+             beta = beta_params[[2]],
+             diag_prob = rbeta(1, alpha, beta)) |>
+      ungroup() |>
+      select(Age, Group, Diagnosis, diag_prob)
       
     # Return to work/sick leave due to diagnosis
     # https://doi.org/10.1002/pon.1820
@@ -135,8 +117,7 @@ run_model_loop <- function(cancer_type, gender) {
     } else {
       rgamma(1, shape = 148.905, 1.088) / 30.438
     }
-    
-    # Rate of cancer diagnoses in the population
+
     
     
     # Percent of cancer attributable to HPV
@@ -164,8 +145,8 @@ run_model_loop <- function(cancer_type, gender) {
     # Derive benefit modifier for income losses
     vaccine_benefit <- (1 - pct_hpv) + (vaccine_eff * pct_hpv)
     
-    # Need the final piece - the prevalence of each cancer to quantify the vaccine benefit
-    
+    # Now the final piece - combine the benefit with the prevalence from cancer_rate
+
     # Populate table of results
     sims[[i]] <- tibble(
       Iteration = i,
