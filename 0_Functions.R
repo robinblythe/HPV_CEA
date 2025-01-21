@@ -42,7 +42,8 @@ run_model_loop <- function(cancer_type, gender) {
     # Convert unemployment odds ratio to probability and combine with cancer-specific probabilities
     # https://jamanetwork.com/journals/jama/fullarticle/183387
     sim_incomes <- median_income |>
-      filter(Sex == gender) |>
+      filter(Sex == gender,
+             Age >= age_start) |>
       mutate(
         Participation_rate_cancer =
           if (gender == "Female" & cancer_type %in% c("Cervical", "Vaginal", "Vulval", "Anal")) {
@@ -67,18 +68,17 @@ run_model_loop <- function(cancer_type, gender) {
       function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_cancer", gender = gender)
     )
     
-    browser()
-    
     # Mortality adjustment
     mort_adj <- cancer_mortality |>
       filter(Group == gender,
-             Diagnosis == cancer_type) |>
+             Diagnosis == cancer_type,
+             Age >= age_start) |>
       # Need the remaining income from age + survival time to get foregone income
       # Otherwise it's a huge overestimate because it assumes same remaining lifetime income regardless of survival
       mutate(join_age = Age + survival_time - 1) |>
       left_join(
         tibble(
-          Age = seq(10, 84, 1),
+          Age = seq(age_start, age_end, 1),
           income_cancer = as.vector(do.call(rbind, lifetime_income$cancer))
           ),
         by = join_by(join_age == Age)
@@ -99,7 +99,8 @@ run_model_loop <- function(cancer_type, gender) {
     # Rate of cancer diagnoses in the population
     cancer_rate <- cancer_incidence |>
       filter(Group == gender,
-             Diagnosis == cancer_type) |>
+             Diagnosis == cancer_type,
+             Age >= age_start) |>
       rowwise() |>
       mutate(beta_params = list(est_beta(pred_rate, se_pred_rate)),
              alpha = beta_params[[1]],
@@ -108,18 +109,16 @@ run_model_loop <- function(cancer_type, gender) {
       ungroup() |>
       select(Age, Group, Diagnosis, diag_prob)
       
-    # Return to work/sick leave due to diagnosis
+    # Return to work/sick leave due to diagnosis (in)
     # https://doi.org/10.1002/pon.1820
     rtw <- if (cancer_type == "Oropharyngeal") {
       rgamma(1, shape = 2.456, scale = 3.069)
     } else if (gender == "Male") {
       rgamma(1, shape = 659.678, scale = 0.159) / 30.438
     } else {
-      rgamma(1, shape = 148.905, 1.088) / 30.438
+      rgamma(1, shape = 148.905, scale = 1.088) / 30.438
     }
 
-    
-    
     # Percent of cancer attributable to HPV
     # https://onlinelibrary.wiley.com/doi/epdf/10.1002/ijc.30716
     pct_hpv <- case_when(
@@ -142,30 +141,26 @@ run_model_loop <- function(cancer_type, gender) {
       cancer_type == "Penile" | (cancer_type == "Anal" & gender == "Male") ~ rbeta(1, shape1 = 7.524, shape2 = 39.539)
     )
 
-    # Derive benefit modifier for income losses
-    vaccine_benefit <- (1 - pct_hpv) + (vaccine_eff * pct_hpv)
-    
-    # Now the final piece - combine the benefit with the prevalence from cancer_rate
-
     # Populate table of results
     sims[[i]] <- tibble(
       Iteration = i,
       Diagnosis = cancer_type,
       Gender = gender,
-      Diagnosis_age = seq(age_start, age_end, 1),
-      Participation_rate_cancer_by_age = sim_incomes$Participation_rate_cancer,
-      Weighted_income_cancer_by_age = sim_incomes$Weighted_income_cancer,
-      Mortality_decrement = -mort_adj$mort_decrement
-    ) |>
+      Diagnosis_age = seq(age_start, age_end, 1)
+      ) |>
       rowwise() |>
       mutate(
-        Income_healthy = lifetime_income$healthy[[Diagnosis_age - 9]],
-        Income_cancer = lifetime_income$cancer[[Diagnosis_age - 9]],
-        Sick_leave_decrement = rtw / 12 * -median_income$Weighted_income_annual[median_income$Age == Diagnosis_age & median_income$Sex == gender],
-        Adjusted_income_cancer = Income_cancer + Sick_leave_decrement + Mortality_decrement,
-        Lost_income_cancer = Income_healthy - Adjusted_income_cancer,
-        Income_protection_vaccination = Income_healthy - Adjusted_income_cancer * vaccine_benefit, # add HPV prevalence here
-        Net_benefit_vaccination = Income_protection_vaccination - cost_vc
+        Income_healthy = lifetime_income$healthy[[Diagnosis_age - age_start + 1]],
+        Income_cancer = lifetime_income$cancer[[Diagnosis_age - age_start + 1]],
+        Sick_leave_decrement = (rtw / 12) * -median_income$Weighted_income_annual[median_income$Age == Diagnosis_age & median_income$Sex == gender],
+        Mortality_decrement = -mort_adj$mort_decrement[[Diagnosis_age - age_start + 1]], # Lost income due to excess cancer mortality
+        EV_income_cancer = Income_cancer + Sick_leave_decrement + Mortality_decrement, # Expected lifetime income after cancer diagnosis
+        Lost_income_cancer = EV_income_cancer - Income_healthy, # Lost income due to cancer diagnosis
+        EV_cancer_no_vc = Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]], # Prevalence adjusted lost income
+        EV_cancer_vc = 
+          Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (1 - pct_hpv) +
+          Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (pct_hpv * vaccine_eff),
+        Vaccination_benefit = EV_cancer_vc - EV_cancer_no_vc
       )
   }
   return(do.call(rbind, sims))
