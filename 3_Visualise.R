@@ -1,0 +1,94 @@
+options(scipen= 100, digits = 3)
+library(tidyverse)
+library(ggridges)
+library(viridis)
+results <- read_rds(file = "simulation_results.rds")
+cost_vc <- 123
+
+# Net benefit of vaccination by gender:
+df_nmb <- results |>
+  group_by(Iteration, Gender) |>
+  summarise(NMB = sum(Vaccination_benefit) - cost_vc) |>
+  mutate(Diagnosis = "All cancers")
+
+# Net benefit - cancer-specific
+# Note: "All cancers" NMB is significantly greater than the other 3 put together;
+## This is because the cost of vaccination should only be applied once
+## i.e. it's (NMB_Penile + NMB_Oropharyngeal + NMB_Anal) - cost_vc, not the sum of (each one - cost_vc)
+df_cancer <- results |>
+  group_by(Iteration, Gender, Diagnosis) |>
+  summarise(NMB = sum(Vaccination_benefit) - cost_vc) |>
+  bind_rows(df_nmb)
+
+remove(df_nmb)
+
+p_cancer <- df_cancer |>
+  rename(Sex = Gender) |>
+  ggplot(aes(x = NMB, y = Diagnosis, fill = Diagnosis))
+
+p_cancer +
+  stat_density_ridges(quantile_lines = TRUE, quantiles = 2) +
+  geom_vline(xintercept = 0) +
+  scale_fill_viridis_d(guide = "none") +
+  theme_bw() +
+  facet_wrap(vars(Sex), scales = "free") +
+  xlab("Net value of productivity gains from HPV vaccination")
+
+# Explaining results
+summary <- results |>
+  group_by(Diagnosis, Gender, Diagnosis_age) |>
+  summarise(
+    Lost_income_median = median(Lost_income_cancer),
+    Lost_income_low = quantile(Lost_income_cancer, 0.025),
+    Lost_income_high = quantile(Lost_income_cancer, 0.975),
+    .groups = "keep"
+  )
+
+dd <- datadist(summary); options(datadist = "dd")
+fit <- ols(Lost_income_median ~ rcs(Diagnosis_age, 5) * Gender, data = subset(summary, Diagnosis == "Oropharyngeal"))
+plot(Predict(fit))
+
+p <- summary |>
+  mutate(Diagnosis = factor(Diagnosis, levels = c("Anal", "Cervical", "Penile", "Oropharyngeal", "Vaginal", "Vulval"))) |>
+  ggplot(aes(
+    x = Diagnosis_age,
+    y = -Lost_income_median,
+    ymin = Lost_income_low,
+    ymax = Lost_income_high
+  ))
+
+p +
+  geom_smooth() +
+  facet_wrap(vars(Gender, Diagnosis), nrow = 2, ncol = 5) +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  scale_y_continuous(name = "Lost income per cancer survivor (2024 SGD)", 
+                     label = scales::comma)
+
+ggsave(file = "income_losses_diagnosis.png", height = 8, width = 8)
+
+models <- summary |>
+  group_by(Diagnosis, Gender) |>
+  nest() |>
+  mutate(model = map(data, function(df) lm(Lost_income_median ~ Diagnosis_age, data = df)))
+
+results_summary <- models |>
+  mutate(Annual_loss = model[[row_number()]]$coefficients[[2]]) |>
+  select(Diagnosis, Gender, Annual_loss)
+
+p_check <- oro |>
+  ggplot(aes(x = Diagnosis_age, colour = Gender))
+
+p_check +
+  geom_line(aes(y = Income_healthy, linetype = "Income healthy")) +
+  geom_line(aes(y = Income_cancer, linetype = "Income cancer")) +
+  scale_linetype_manual(values = c("Income healthy" = "solid", "Income cancer" = "dashed")) +
+  theme_bw()
+
+p_check +
+  geom_line(aes(y = Participation_rate_cancer_by_age)) +
+  theme_bw()
+
+# Interesting result here - women have higher net income losses than men
+# Reason being - in Singapore, women have greater labour force participation than men in the early career stage
+# Therefore they lose out more with an early diagnosis
