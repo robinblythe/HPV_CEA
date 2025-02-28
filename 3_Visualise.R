@@ -5,6 +5,10 @@ library(viridis)
 results <- read_rds(file = "simulation_results.rds")
 cost_vc <- 123
 
+# Some other visualisations that might be useful:
+# Male vs female income by healthy and cancer type
+# Survival curves by gender and cancer type
+
 # Net benefit of vaccination by gender:
 df_nmb <- results |>
   group_by(Iteration, Gender) |>
