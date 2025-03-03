@@ -73,9 +73,8 @@ run_model_loop <- function(cancer_type, gender) {
       filter(Group == gender,
              Diagnosis == cancer_type,
              Age >= age_start) |>
-      # Need the remaining income from age + survival time to get foregone income
-      # Otherwise it's a huge overestimate because it assumes same remaining lifetime income regardless of survival
-      mutate(join_age = Age + survival_time - 1) |>
+      mutate(join_age = Age + survival_time - 1,
+             p_mort = 1 - p_survival) |>
       left_join(
         tibble(
           Age = seq(age_start, age_end, 1),
@@ -83,14 +82,19 @@ run_model_loop <- function(cancer_type, gender) {
           ),
         by = join_by(join_age == Age)
       ) |>
+      group_by(Age) |>
+      mutate(p_mort_annual = p_mort - lag(p_mort),
+             p_mort_annual = ifelse(is.na(p_mort_annual), p_mort, p_mort_annual),
+             p_mort_annual = ifelse(p_mort_annual == 0, NA, p_mort_annual),
+             se_mort_diff = sqrt(se_survival + lag(se_survival, default = 0))) |>
+      fill(p_mort_annual, .direction = c("down")) |>
       rowwise() |>
-      mutate(beta_params = list(est_beta(p_survival, se_survival)),
+      mutate(beta_params = list(est_beta(p_mort_annual, se_mort_diff)),
              alpha = beta_params[[1]],
              beta = beta_params[[2]],
-             surv_prob = rbeta(1, alpha, beta),
-             annual_decrement = income_cancer * (1 - surv_prob)) |>
-      ungroup() |>
+             mort_prob = rbeta(1, alpha, beta)) |>
       group_by(Age) |>
+      mutate(annual_decrement = income_cancer * mort_prob) |>
       summarise(mort_decrement = sum(annual_decrement))
     
     # Add back in the cut-off 84 y/o remainder

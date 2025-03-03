@@ -1,4 +1,4 @@
-options(scipen = 100, digits = 3)
+options(scipen = 100, digits = 5)
 load("model_data.Rdata")
 
 ### Run models
@@ -6,6 +6,7 @@ library(rms)
 library(tidyverse)
 library(foreach)
 library(doParallel)
+library(air)
 
 set.seed(888)
 
