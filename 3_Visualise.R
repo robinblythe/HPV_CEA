@@ -1,13 +1,10 @@
 options(scipen= 100, digits = 3)
 library(tidyverse)
+library(rms)
 library(ggridges)
 library(viridis)
 results <- read_rds(file = "simulation_results.rds")
 cost_vc <- 123
-
-# Some other visualisations that might be useful:
-# Male vs female income by healthy and cancer type
-# Survival curves by gender and cancer type
 
 # Net benefit of vaccination by gender:
 df_nmb <- results |>
@@ -22,7 +19,14 @@ df_nmb <- results |>
 df_cancer <- results |>
   group_by(Iteration, Gender, Diagnosis) |>
   summarise(NMB = sum(Vaccination_benefit) - cost_vc) |>
-  bind_rows(df_nmb)
+  bind_rows(df_nmb) |>
+  arrange(Iteration, Diagnosis)
+
+df_final_results <- df_nmb |>
+  group_by(Gender) |>
+  summarise(NMB_median = median(NMB),
+            NMB_low = quantile(NMB, 0.025),
+            NMB_high = quantile(NMB, 0.975))
 
 remove(df_nmb)
 
@@ -36,9 +40,11 @@ p_cancer +
   scale_fill_viridis_d(guide = "none") +
   theme_bw() +
   facet_wrap(vars(Sex), scales = "free") +
-  xlab("Net value of productivity gains from HPV vaccination")
+  xlab("Net value of productivity gains from HPV vaccination (2025 SGD)")
 
-# Explaining results
+ggsave(filename = "NMB_by_diagnosis.jpg", height = 8, width = 12)
+
+# Explaining results for cancer survivors
 summary <- results |>
   group_by(Diagnosis, Gender, Diagnosis_age) |>
   summarise(
@@ -66,10 +72,12 @@ p +
   facet_wrap(vars(Gender, Diagnosis), nrow = 2, ncol = 5) +
   theme_bw() +
   theme(panel.grid.minor = element_blank()) +
-  scale_y_continuous(name = "Lost income per cancer survivor (2024 SGD)", 
-                     label = scales::comma)
+  scale_y_continuous(name = "Lost income per cancer survivor (2025 SGD)", 
+                     label = scales::comma) +
+  scale_x_continuous(name = "Age at cancer diagnosis",
+                     limits = c(16, 84), breaks = seq(16, 84, 17))
 
-ggsave(file = "income_losses_diagnosis.png", height = 8, width = 8)
+ggsave(filename = "income_losses_diagnosis.jpg", height = 8, width = 10)
 
 models <- summary |>
   group_by(Diagnosis, Gender) |>
@@ -80,19 +88,5 @@ results_summary <- models |>
   mutate(Annual_loss = model[[row_number()]]$coefficients[[2]]) |>
   select(Diagnosis, Gender, Annual_loss)
 
-p_check <- oro |>
-  ggplot(aes(x = Diagnosis_age, colour = Gender))
+remove(models)
 
-p_check +
-  geom_line(aes(y = Income_healthy, linetype = "Income healthy")) +
-  geom_line(aes(y = Income_cancer, linetype = "Income cancer")) +
-  scale_linetype_manual(values = c("Income healthy" = "solid", "Income cancer" = "dashed")) +
-  theme_bw()
-
-p_check +
-  geom_line(aes(y = Participation_rate_cancer_by_age)) +
-  theme_bw()
-
-# Interesting result here - women have higher net income losses than men
-# Reason being - in Singapore, women have greater labour force participation than men in the early career stage
-# Therefore they lose out more with an early diagnosis

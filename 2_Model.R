@@ -6,7 +6,6 @@ library(rms)
 library(tidyverse)
 library(foreach)
 library(doParallel)
-library(air)
 
 set.seed(888)
 
@@ -29,7 +28,7 @@ cancers = c("Oropharyngeal", "Cervical", "Vulval", "Vaginal", "Anal",
             "Oropharyngeal", "Penile", "Anal")
 sexes = c(rep("Female", 5), rep("Male", 3))
 
-sims <- foreach(i = 1:length(cancers), .packages = "dplyr") %dopar% {
+sims <- foreach(i = 1:length(cancers), .packages = c("dplyr", "tidyr")) %dopar% {
   run_model_loop(cancers[i], sexes[i])
 }
 

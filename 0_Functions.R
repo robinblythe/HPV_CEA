@@ -162,8 +162,8 @@ run_model_loop <- function(cancer_type, gender) {
         Lost_income_cancer = EV_income_cancer - Income_healthy, # Lost income due to cancer diagnosis
         EV_cancer_no_vc = Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]], # Prevalence adjusted lost income
         EV_cancer_vc = 
-          Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (1 - pct_hpv) +
-          Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (pct_hpv * vaccine_eff),
+          Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (1 - pct_hpv) + # Diagnoses not due to HPV
+          Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (pct_hpv * vaccine_eff), # Diagnoses preventable by vaccination
         Vaccination_benefit = EV_cancer_vc - EV_cancer_no_vc
       )
   }
