@@ -23,7 +23,7 @@ get_lifetime_income <- function(data, age, income, gender) {
     pull()
 }
 
-est_beta <- function(p, se){
+est_beta <- function(p, se) {
   alpha <- (p * (1 - p)) / (se^2) - p
   beta <- alpha * (1 - p) / p
   return(c(alpha, beta))
@@ -31,19 +31,19 @@ est_beta <- function(p, se){
 
 
 run_model_loop <- function(cancer_type, gender) {
-  
   sims <- list()
-  
+
   # Workforce participation due to cancers
   # https://jamanetwork.com/journals/jama/fullarticle/183387
 
   for (i in 1:iter) {
-    
     # Convert unemployment odds ratio to probability and combine with cancer-specific probabilities
     # https://jamanetwork.com/journals/jama/fullarticle/183387
     sim_incomes <- median_income |>
-      filter(Sex == gender,
-             Age >= age_start) |>
+      filter(
+        Sex == gender,
+        Age >= age_start
+      ) |>
       mutate(
         Participation_rate_cancer =
           if (gender == "Female" & cancer_type %in% c("Cervical", "Vaginal", "Vulval", "Anal")) {
@@ -55,64 +55,76 @@ run_model_loop <- function(cancer_type, gender) {
           },
         Weighted_income_cancer = Participation_rate_cancer * Monthly_income * 12
       )
-    
+
     # Lifetime income function summarises expected remaining income for each year (x) until end of working life
     lifetime_income <- list()
     lifetime_income$healthy <- lapply(
       seq(age_start, age_end, 1),
       function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_annual", gender = gender)
     )
-    
+
     lifetime_income$cancer <- lapply(
       seq(age_start, age_end, 1),
       function(x) get_lifetime_income(sim_incomes, age = x, income = "Weighted_income_cancer", gender = gender)
     )
-    
+
     # Mortality adjustment
     mort_adj <- cancer_mortality |>
-      filter(Group == gender,
-             Diagnosis == cancer_type,
-             Age >= age_start) |>
-      mutate(join_age = Age + survival_time - 1,
-             p_mort = 1 - p_survival) |>
+      filter(
+        Group == gender,
+        Diagnosis == cancer_type,
+        Age >= age_start
+      ) |>
+      mutate(
+        join_age = Age + survival_time - 1,
+        p_mort = 1 - p_survival
+      ) |>
       left_join(
         tibble(
           Age = seq(age_start, age_end, 1),
           income_cancer = as.vector(do.call(rbind, lifetime_income$cancer))
-          ),
+        ),
         by = join_by(join_age == Age)
       ) |>
       group_by(Age) |>
-      mutate(p_mort_annual = p_mort - lag(p_mort),
-             p_mort_annual = ifelse(is.na(p_mort_annual), p_mort, p_mort_annual),
-             p_mort_annual = ifelse(p_mort_annual == 0, NA, p_mort_annual),
-             se_mort_diff = sqrt(se_survival + lag(se_survival, default = 0))) |>
+      mutate(
+        p_mort_annual = p_mort - lag(p_mort),
+        p_mort_annual = ifelse(is.na(p_mort_annual), p_mort, p_mort_annual),
+        p_mort_annual = ifelse(p_mort_annual == 0, NA, p_mort_annual),
+        se_mort_diff = sqrt(se_survival + lag(se_survival, default = 0))
+      ) |>
       fill(p_mort_annual, .direction = c("down")) |>
       rowwise() |>
-      mutate(beta_params = list(est_beta(p_mort_annual, se_mort_diff)),
-             alpha = beta_params[[1]],
-             beta = beta_params[[2]],
-             mort_prob = rbeta(1, alpha, beta)) |>
+      mutate(
+        beta_params = list(est_beta(p_mort_annual, se_mort_diff)),
+        alpha = beta_params[[1]],
+        beta = beta_params[[2]],
+        mort_prob = rbeta(1, alpha, beta)
+      ) |>
       group_by(Age) |>
       mutate(annual_decrement = income_cancer * mort_prob) |>
       summarise(mort_decrement = sum(annual_decrement))
-    
+
     # Add back in the cut-off 84 y/o remainder
-    mort_adj[nrow(mort_adj) + 1, ] = list(84, 0)
-    
+    mort_adj[nrow(mort_adj) + 1, ] <- list(84, 0)
+
     # Rate of cancer diagnoses in the population
     cancer_rate <- cancer_incidence |>
-      filter(Group == gender,
-             Diagnosis == cancer_type,
-             Age >= age_start) |>
+      filter(
+        Group == gender,
+        Diagnosis == cancer_type,
+        Age >= age_start
+      ) |>
       rowwise() |>
-      mutate(beta_params = list(est_beta(pred_rate, se_pred_rate)),
-             alpha = beta_params[[1]],
-             beta = beta_params[[2]],
-             diag_prob = rbeta(1, alpha, beta)) |>
+      mutate(
+        beta_params = list(est_beta(pred_rate, se_pred_rate)),
+        alpha = beta_params[[1]],
+        beta = beta_params[[2]],
+        diag_prob = rbeta(1, alpha, beta)
+      ) |>
       ungroup() |>
       select(Age, Group, Diagnosis, diag_prob)
-      
+
     # Return to work/sick leave due to diagnosis (in)
     # https://doi.org/10.1002/pon.1820
     rtw <- if (cancer_type == "Oropharyngeal") {
@@ -151,7 +163,7 @@ run_model_loop <- function(cancer_type, gender) {
       Diagnosis = cancer_type,
       Gender = gender,
       Diagnosis_age = seq(age_start, age_end, 1)
-      ) |>
+    ) |>
       rowwise() |>
       mutate(
         Income_healthy = lifetime_income$healthy[[Diagnosis_age - age_start + 1]],
@@ -161,12 +173,11 @@ run_model_loop <- function(cancer_type, gender) {
         EV_income_cancer = Income_cancer + Sick_leave_decrement + Mortality_decrement, # Expected lifetime income after cancer diagnosis
         Lost_income_cancer = EV_income_cancer - Income_healthy, # Lost income due to cancer diagnosis
         EV_cancer_no_vc = Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]], # Prevalence adjusted lost income
-        EV_cancer_vc = 
+        EV_cancer_vc =
           Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (1 - pct_hpv) + # Diagnoses not due to HPV
-          Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (pct_hpv * vaccine_eff), # Diagnoses preventable by vaccination
+            Lost_income_cancer * cancer_rate$diag_prob[[Diagnosis_age - age_start + 1]] * (pct_hpv * vaccine_eff), # Diagnoses preventable by vaccination
         Vaccination_benefit = EV_cancer_vc - EV_cancer_no_vc
       )
   }
   return(do.call(rbind, sims))
 }
-

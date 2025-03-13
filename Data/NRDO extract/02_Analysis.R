@@ -13,9 +13,11 @@ dd <- datadist(df_surv)
 options(datadist = "dd")
 
 # Standard Cox regression
-fit <- coxph(Surv(survival_time, death_hpv) ~ rcs(age_at_diagnosis, 4) + gender +
-             strata(cancer_type), 
-           data = df_surv, x = T, y = T)
+fit <- coxph(
+  Surv(survival_time, death_hpv) ~ rcs(age_at_diagnosis, 4) + gender +
+    strata(cancer_type),
+  data = df_surv, x = T, y = T
+)
 
 # Create hypothetical datasets of individuals
 # 8 groups: Male and female oropharyngeal; male and female anal; female cervical, vaginal, vulval; male penile
@@ -26,8 +28,8 @@ df_predicted <- expand.grid(
   survival_time = seq(1, 30, 1),
   death_hpv = 0
 )
-df_predicted <- df_predicted[!(df_predicted$gender == "M" & df_predicted$cancer_type %in% c("Cervix", "Vagina", "Vulva")),]
-df_predicted <- df_predicted[!(df_predicted$gender == "F" & df_predicted$cancer_type == "Penis"),]
+df_predicted <- df_predicted[!(df_predicted$gender == "M" & df_predicted$cancer_type %in% c("Cervix", "Vagina", "Vulva")), ]
+df_predicted <- df_predicted[!(df_predicted$gender == "F" & df_predicted$cancer_type == "Penis"), ]
 
 preds_coxph <- predict(fit, newdata = df_predicted, type = "survival", se.fit = TRUE)
 df_predicted$p_survival <- preds_coxph$fit

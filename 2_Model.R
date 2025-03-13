@@ -24,9 +24,11 @@ cl <- makeCluster(cores)
 registerDoParallel(cl)
 
 sims <- list()
-cancers = c("Oropharyngeal", "Cervical", "Vulval", "Vaginal", "Anal",
-            "Oropharyngeal", "Penile", "Anal")
-sexes = c(rep("Female", 5), rep("Male", 3))
+cancers <- c(
+  "Oropharyngeal", "Cervical", "Vulval", "Vaginal", "Anal",
+  "Oropharyngeal", "Penile", "Anal"
+)
+sexes <- c(rep("Female", 5), rep("Male", 3))
 
 sims <- foreach(i = 1:length(cancers), .packages = c("dplyr", "tidyr")) %dopar% {
   run_model_loop(cancers[i], sexes[i])
@@ -34,4 +36,3 @@ sims <- foreach(i = 1:length(cancers), .packages = c("dplyr", "tidyr")) %dopar% 
 
 results <- do.call(rbind, sims) |> ungroup()
 saveRDS(results, file = "simulation_results.rds", compress = FALSE)
-

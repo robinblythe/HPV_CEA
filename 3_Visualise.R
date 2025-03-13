@@ -1,4 +1,4 @@
-options(scipen= 100, digits = 3)
+options(scipen = 100, digits = 3)
 library(tidyverse)
 library(rms)
 library(ggridges)
@@ -24,9 +24,11 @@ df_cancer <- results |>
 
 df_final_results <- df_nmb |>
   group_by(Gender) |>
-  summarise(NMB_median = median(NMB),
-            NMB_low = quantile(NMB, 0.025),
-            NMB_high = quantile(NMB, 0.975))
+  summarise(
+    NMB_median = median(NMB),
+    NMB_low = quantile(NMB, 0.025),
+    NMB_high = quantile(NMB, 0.975)
+  )
 
 remove(df_nmb)
 
@@ -40,7 +42,7 @@ p_cancer +
   scale_fill_viridis_d(guide = "none") +
   theme_bw() +
   facet_wrap(vars(Sex), scales = "free") +
-  xlab("Net value of productivity gains from HPV vaccination (2025 SGD)")
+  xlab("NMB of HPV vaccination per individual (2025 SGD)")
 
 ggsave(filename = "NMB_by_diagnosis.jpg", height = 8, width = 12)
 
@@ -54,7 +56,8 @@ summary <- results |>
     .groups = "keep"
   )
 
-dd <- datadist(summary); options(datadist = "dd")
+dd <- datadist(summary)
+options(datadist = "dd")
 fit <- ols(Lost_income_median ~ rcs(Diagnosis_age, 5) * Gender, data = subset(summary, Diagnosis == "Oropharyngeal"))
 plot(Predict(fit))
 
@@ -72,10 +75,14 @@ p +
   facet_wrap(vars(Gender, Diagnosis), nrow = 2, ncol = 5) +
   theme_bw() +
   theme(panel.grid.minor = element_blank()) +
-  scale_y_continuous(name = "Lost income per cancer survivor (2025 SGD)", 
-                     label = scales::comma) +
-  scale_x_continuous(name = "Age at cancer diagnosis",
-                     limits = c(16, 84), breaks = seq(16, 84, 17))
+  scale_y_continuous(
+    name = "Productivity losses per cancer diagnosis (2025 SGD)",
+    label = scales::comma
+  ) +
+  scale_x_continuous(
+    name = "Age at cancer diagnosis",
+    limits = c(16, 84), breaks = seq(16, 84, 17)
+  )
 
 ggsave(filename = "income_losses_diagnosis.jpg", height = 8, width = 10)
 
@@ -89,4 +96,3 @@ results_summary <- models |>
   select(Diagnosis, Gender, Annual_loss)
 
 remove(models)
-
