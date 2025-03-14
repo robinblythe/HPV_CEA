@@ -93,6 +93,7 @@ models <- summary |>
 
 results_summary <- models |>
   mutate(Annual_loss = model[[row_number()]]$coefficients[[2]]) |>
-  select(Diagnosis, Gender, Annual_loss)
+  select(Diagnosis, Gender, Annual_loss) |>
+  rename(Sex = Gender)
 
 remove(models)

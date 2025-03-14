@@ -53,7 +53,7 @@ run_model_loop <- function(cancer_type, gender) {
           } else {
             get_odds(1 / (1 - rbeta(1, 13480, 6886)) / (1 / (1 - rbeta(1, 133588, 24015))), Participation_rate)
           },
-        Weighted_income_cancer = Participation_rate_cancer * Monthly_income * 12
+        Weighted_income_cancer = Participation_rate_cancer * Predicted_income * 12
       )
 
     # Lifetime income function summarises expected remaining income for each year (x) until end of working life

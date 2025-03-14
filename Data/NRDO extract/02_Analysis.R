@@ -54,9 +54,4 @@ df_count <- df_surv |>
 
 df_count$n[is.na(df_count$n)] <- 0
 
-df_count <- df_count |>
-  group_by(cancer_type, gender) |>
-  mutate(n_predicted = fitted(smooth.spline(x = age_at_diagnosis, y = n))) |>
-  ungroup()
-
 write_csv(df_count, file = "Z:/output/n_cases_predicted.csv")

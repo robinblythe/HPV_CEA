@@ -36,7 +36,7 @@ cancer_mortality <- vroom("./Data/NRDO extract/predictions_coxph.csv") |>
 cancer_incidence <- vroom("./Data/NRDO extract/n_cases_predicted.csv") |>
   mutate(Group = ifelse(gender == "F", "Female", "Male")) |>
   left_join(census, join_by(age_at_diagnosis == Age, Group)) |>
-  mutate(Rate = (n / 20) / Pop_total) |> # 20 years worth of registry data (1992 - 2022)
+  mutate(Rate = (n / 29) / Pop_total) |> # 30 years worth of registry data (1992 - 2021)
   group_by(cancer_type, Group) |>
   nest() %>%
   mutate(
@@ -61,7 +61,7 @@ cancer_incidence <- vroom("./Data/NRDO extract/n_cases_predicted.csv") |>
 
 
 # Median income by age group
-df_median_income <- vroom("./Data/Median_income_by_age.csv", delim = ",", show_col_types = F)
+df_median_income <- vroom("./Data/Median_income_by_age_sex.csv", delim = ",", show_col_types = F)
 
 incomes <- df_median_income |>
   rowwise() |>
@@ -71,24 +71,13 @@ incomes <- df_median_income |>
     Age = list(seq(start_age, end_age, 1))
   ) |>
   unnest(Age) |>
-  select(Age, Total) |>
-  bind_rows(tibble(
-    Age = c(
-      seq(10, 14, 1),
-      seq(65, 84, 1)
-    ),
-    Total = c(
-      rep(0, 5),
-      rep(NA_real_, 20)
-    )
-  )) |>
+  select(Age, Sex, Monthly_income) |>
   arrange(Age)
 
 remove(df_median_income)
 
 
 # Labour force participation by age group
-# Should add a smoother here
 df_employment <- vroom("./Data/labour_participation_rate.csv", show_col_types = F)
 employment <- df_employment |>
   select(-year) |>
@@ -113,21 +102,28 @@ employment <- df_employment |>
     by = join_by(Age, Sex, Participation_rate)
   )
 
-remove(df_employment, get_lifetime_income)
+fit_m <- with(subset(employment, Sex == "Male"), smooth.spline(Age, Participation_rate, spar = 0.65))
+fit_f <- with(subset(employment, Sex == "Female"), smooth.spline(Age, Participation_rate, spar = 0.65))
+employment$Participation_rate <- ifelse(
+  employment$Sex == "Male", 
+  pmax(predict(fit_m, x = employment$Age)$y, 0),
+  pmax(predict(fit_f, x = employment$Age)$y, 0)
+)
+
+remove(df_employment, get_lifetime_income, fit_m, fit_f)
 
 #########################################
 ## Income estimation
 # Estimate median wage across the workforce to generate senior incomes:
 # Spar term chosen by visual analysis to create a smoothed quadratic curve
-fit <- with(na.omit(incomes), smooth.spline(Age, Total, spar = 0.94))
-incomes <- do.call(cbind, predict(fit, x = seq(15, 84, 1))) |>
-  as_tibble() |>
-  rename(
-    Age = x,
-    Total = y
-  ) |>
-  mutate(Monthly_income = ifelse(Total < 0, 0, Total)) |>
-  select(-Total)
+fit_m <- with(subset(incomes, Sex == "Male"), smooth.spline(Age, Monthly_income, spar = 0.9))
+fit_f <- with(subset(incomes, Sex == "Female"), smooth.spline(Age, Monthly_income, spar = 0.9))
+incomes$Predicted_income <- ifelse(
+  incomes$Sex == "Male",
+  pmax(predict(fit_m, x = incomes$Age)$y, 0),
+  pmax(predict(fit_f, x = incomes$Age)$y, 0)
+)
+
 
 # Fit check
 # incomes |> ggplot(aes(x = Age, y = Total)) +
@@ -136,11 +132,12 @@ incomes <- do.call(cbind, predict(fit, x = seq(15, 84, 1))) |>
 
 # Merge employment with incomes to get an adjusted total income (annual)
 median_income <- employment |>
-  left_join(incomes, by = join_by(Age)) |>
-  mutate(Weighted_income_annual = Participation_rate * Monthly_income * 12) %>%
+  left_join(incomes, by = join_by(Age, Sex)) |>
+  mutate(Weighted_income_annual = Participation_rate * Predicted_income * 12) %>%
   replace(is.na(.), 0) |>
-  arrange(Sex, Age)
+  arrange(Sex, Age) |>
+  select(-Monthly_income)
 
-remove(incomes, employment, fit)
+remove(incomes, employment, fit_m, fit_f)
 
 save(median_income, cancer_incidence, cancer_mortality, file = "model_data.Rdata")
