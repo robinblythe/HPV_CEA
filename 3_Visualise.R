@@ -56,6 +56,19 @@ summary <- results |>
     .groups = "keep"
   )
 
+# Some spot results:
+summary_table <- summary |>
+  filter(Diagnosis_age %in% c(33, 50, 67)) |>
+  mutate(
+    "Median lost income" = scales::dollar(Lost_income_median),
+    "95% uncertainty interval" = paste0(
+    "[", scales::dollar(round(Lost_income_low)), " to ", scales::dollar(round(Lost_income_high)), "]")
+    ) |>
+  select(-c(Lost_income_low, Lost_income_high, Lost_income_median)) |>
+  rename(Sex = Gender, Cancer = Diagnosis, Age = Diagnosis_age)
+
+write.csv(summary_table, file = "summary_results.csv")
+
 dd <- datadist(summary)
 options(datadist = "dd")
 fit <- ols(Lost_income_median ~ rcs(Diagnosis_age, 5) * Gender, data = subset(summary, Diagnosis == "Oropharyngeal"))
