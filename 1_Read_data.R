@@ -7,9 +7,9 @@ source("./0_Functions.R")
 # Population by age
 df_census <- vroom("./Data/population_by_age.csv", show_col_types = F)
 census <- df_census |>
-  select(Age, Gender, `2019`) |>
+  select(Age, Gender, `2024`) |>
   rename(
-    Pop_total = `2019`,
+    Pop_total = `2024`,
     Group = Gender
   ) |>
   mutate(Age = as.numeric(substr(Age, 1, 2)))
