@@ -66,13 +66,14 @@ p <- summary |>
   ggplot(aes(
     x = Diagnosis_age,
     y = -Lost_income_median,
-    ymin = Lost_income_low,
-    ymax = Lost_income_high
+    ymin = -Lost_income_low,
+    ymax = -Lost_income_high
   ))
 
 p +
   geom_smooth() +
-  facet_wrap(vars(Gender, Diagnosis), nrow = 2, ncol = 5) +
+  geom_ribbon(fill = "grey", alpha = 0.3) +
+  facet_wrap(vars(Gender, Diagnosis), nrow = 2, ncol = 5, axes = "all_x") +
   theme_bw() +
   theme(panel.grid.minor = element_blank()) +
   scale_y_continuous(
