@@ -22,6 +22,12 @@ df_cancer <- results |>
   bind_rows(df_nmb) |>
   arrange(Iteration, Diagnosis)
 
+df_cancer_results <- df_cancer |>
+  group_by(Gender, Diagnosis) |>
+  summarise(NMB_median = median(NMB),
+            NMB_low = quantile(NMB, 0.025),
+            NMB_high = quantile(NMB, 0.975))
+
 df_final_results <- df_nmb |>
   group_by(Gender) |>
   summarise(

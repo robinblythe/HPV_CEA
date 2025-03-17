@@ -1,4 +1,6 @@
 # Functions for analysis
+
+# Helper function to convert probabilities to odds
 get_odds <- function(OR, p0) {
   p_odds <- p0 / (1 - p0)
   o <- p_odds * OR
@@ -6,9 +8,7 @@ get_odds <- function(OR, p0) {
   return(p1)
 }
 
-
-
-# Get lifetime expected income for each group
+# Helper function to get lifetime expected income for each group
 get_lifetime_income <- function(data, age, income, gender) {
   data |>
     filter(
@@ -23,6 +23,7 @@ get_lifetime_income <- function(data, age, income, gender) {
     pull()
 }
 
+# Helper function to estimate Beta distribution parameters for each line in dataframe
 est_beta <- function(p, se) {
   alpha <- (p * (1 - p)) / (se^2) - p
   beta <- alpha * (1 - p) / p
@@ -30,6 +31,7 @@ est_beta <- function(p, se) {
 }
 
 
+# Main model function
 run_model_loop <- function(cancer_type, gender) {
   sims <- list()
 
