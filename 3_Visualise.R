@@ -48,7 +48,7 @@ p_cancer +
   scale_fill_viridis_d(guide = "none") +
   theme_bw() +
   facet_wrap(vars(Sex), scales = "free") +
-  xlab("NMB of HPV vaccination per individual (2025 SGD)")
+  xlab("Net economic benefit of HPV vaccination per individual (2025 SGD)")
 
 ggsave(filename = "NMB_by_diagnosis.jpg", height = 8, width = 12)
 
@@ -71,7 +71,7 @@ summary_table <- summary |>
     "[", scales::dollar(round(Lost_income_low)), " to ", scales::dollar(round(Lost_income_high)), "]")
     ) |>
   select(-c(Lost_income_low, Lost_income_high, Lost_income_median)) |>
-  rename(Sex = Gender, Cancer = Diagnosis, Age = Diagnosis_age)
+  rename(Sex = Gender, `Cancer diagnosis` = Diagnosis, Age = Diagnosis_age)
 
 write.csv(summary_table, file = "summary_results.csv")
 
@@ -117,3 +117,21 @@ results_summary <- models |>
   rename(Sex = Gender)
 
 remove(models)
+
+## Visualise prevalence
+p <- vroom::vroom("./Data/NRDO extract/n_cases_predicted.csv") |>
+  mutate(Sex = ifelse(gender == "F", "Female", "Male"),
+         avg_cases = n/29) |>
+  ggplot(aes(x = age_at_diagnosis, y = avg_cases, colour = Sex))
+
+p +
+  geom_smooth(method = "gam", se = F, linewidth = 1.5) +
+  facet_wrap(vars(cancer_type), scales = "free_y") +
+  labs(x = "Age at diagnosis",
+       y = "Cases per year (average)") +
+  scale_colour_manual(values = c("Female" = "#D55E00", "Male" = "#0072B2")) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "top")
+
+ggsave(file = "annual_prevalence.jpg", height = 6, width = 8)  
