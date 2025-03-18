@@ -10,7 +10,7 @@ library(doParallel)
 set.seed(888)
 
 discount <- 0.03
-iter <- 1000
+iter <- 10000
 age_start <- 16
 age_end <- 84
 model_year <- 2025
@@ -35,4 +35,4 @@ sims <- foreach(i = 1:length(cancers), .packages = c("dplyr", "tidyr")) %dopar% 
 }
 
 results <- do.call(rbind, sims) |> ungroup()
-saveRDS(results, file = "simulation_results.rds", compress = FALSE)
+arrow::write_parquet(results, "simulation_results.parquet")

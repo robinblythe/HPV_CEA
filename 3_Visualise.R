@@ -3,7 +3,7 @@ library(tidyverse)
 library(rms)
 library(ggridges)
 library(viridis)
-results <- read_rds(file = "simulation_results.rds")
+results <- arrow::read_parquet(file = "simulation_results.parquet")
 cost_vc <- 123
 
 # Net benefit of vaccination by gender:
