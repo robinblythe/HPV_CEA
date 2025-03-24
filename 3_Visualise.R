@@ -9,7 +9,8 @@ cost_vc <- 123
 # Net benefit of vaccination by gender:
 df_nmb <- results |>
   group_by(Iteration, Gender) |>
-  summarise(NMB = sum(Vaccination_benefit) - cost_vc) |>
+  summarise(NMB = sum(EV_cancer_no_vc),
+            NMB_vc = sum(Vaccination_benefit) - cost_vc) |>
   mutate(Diagnosis = "All cancers")
 
 # Net benefit - cancer-specific
@@ -18,7 +19,8 @@ df_nmb <- results |>
 ## i.e. it's (NMB_Penile + NMB_Oropharyngeal + NMB_Anal) - cost_vc, not the sum of (each one - cost_vc)
 df_cancer <- results |>
   group_by(Iteration, Gender, Diagnosis) |>
-  summarise(NMB = sum(Vaccination_benefit) - cost_vc) |>
+  summarise(NMB = sum(EV_cancer_no_vc),
+            NMB_vc = sum(Vaccination_benefit) - cost_vc) |>
   bind_rows(df_nmb) |>
   arrange(Iteration, Diagnosis)
 
@@ -26,14 +28,20 @@ df_cancer_results <- df_cancer |>
   group_by(Gender, Diagnosis) |>
   summarise(NMB_median = median(NMB),
             NMB_low = quantile(NMB, 0.025),
-            NMB_high = quantile(NMB, 0.975))
+            NMB_high = quantile(NMB, 0.975),
+            NMB_vc_median = median(NMB_vc),
+            NMB_vc_low = quantile(NMB_vc, 0.025),
+            NMB_vc_high = quantile(NMB_vc, 0.975))
 
 df_final_results <- df_nmb |>
   group_by(Gender) |>
   summarise(
     NMB_median = median(NMB),
     NMB_low = quantile(NMB, 0.025),
-    NMB_high = quantile(NMB, 0.975)
+    NMB_high = quantile(NMB, 0.975),
+    NMB_vc_median = median(NMB_vc),
+    NMB_vc_low = quantile(NMB_vc, 0.025),
+    NMB_vc_high = quantile(NMB_vc, 0.975)
   )
 
 remove(df_nmb)

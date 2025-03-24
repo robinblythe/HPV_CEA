@@ -36,7 +36,7 @@ cancer_mortality <- vroom("./Data/NRDO extract/predictions_coxph.csv") |>
 cancer_incidence <- vroom("./Data/NRDO extract/n_cases_predicted.csv") |>
   mutate(Group = ifelse(gender == "F", "Female", "Male")) |>
   left_join(census, join_by(age_at_diagnosis == Age, Group)) |>
-  mutate(Rate = (n / 29) / Pop_total) |> # 30 years worth of registry data (1992 - 2021)
+  mutate(Rate = (n / 30) / Pop_total) |> # 30 years worth of registry data (1992 - 2021)
   group_by(cancer_type, Group) |>
   nest() %>%
   mutate(
