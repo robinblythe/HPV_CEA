@@ -4,7 +4,9 @@ library(rms)
 library(ggridges)
 library(viridis)
 results <- arrow::read_parquet(file = "simulation_results.parquet")
-cost_vc <- 123
+discount = 0.03
+model_year = 2025
+cost_vc <- 123*(1+discount)^(model_year - 2021)
 
 # Net benefit of vaccination by gender:
 df_nmb <- results |>
@@ -12,6 +14,12 @@ df_nmb <- results |>
   summarise(NMB = sum(EV_cancer_no_vc),
             NMB_vc = sum(Vaccination_benefit) - cost_vc) |>
   mutate(Diagnosis = "All cancers")
+
+df_sens_cost_vc <- results |>
+  group_by(Iteration, Gender) |>
+  summarise(NMB_vc = sum(Vaccination_benefit)) |>
+  group_by(Gender) |>
+  summarise(cost_vc = median(NMB_vc))
 
 # Net benefit - cancer-specific
 # Note: "All cancers" NMB is significantly greater than the other 3 put together;
@@ -48,14 +56,14 @@ remove(df_nmb)
 
 p_cancer <- df_cancer |>
   rename(Sex = Gender) |>
-  ggplot(aes(x = NMB, y = Diagnosis, fill = Diagnosis))
+  ggplot(aes(x = NMB_vc, y = Diagnosis, fill = Diagnosis))
 
 p_cancer +
   stat_density_ridges(quantile_lines = TRUE, quantiles = 2) +
   geom_vline(xintercept = 0) +
   scale_fill_viridis_d(guide = "none") +
   theme_bw() +
-  facet_wrap(vars(Sex), scales = "free") +
+  facet_wrap(vars(Sex), scales = "free", ncol = 1) +
   xlab("Net economic benefit of HPV vaccination per individual (2025 SGD)")
 
 ggsave(filename = "NMB_by_diagnosis.jpg", height = 8, width = 12)
@@ -98,7 +106,7 @@ p <- summary |>
   ))
 
 p +
-  geom_smooth() +
+  geom_line(linewidth = 1.1, colour = "blue") +
   geom_ribbon(fill = "grey", alpha = 0.3) +
   facet_wrap(vars(Gender, Diagnosis), nrow = 2, ncol = 5, axes = "all_x") +
   theme_bw() +
