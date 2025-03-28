@@ -66,7 +66,7 @@ p_cancer +
   facet_wrap(vars(Sex), scales = "free", ncol = 1) +
   xlab("Net economic benefit of HPV vaccination per individual (2025 SGD)")
 
-ggsave(filename = "NMB_by_diagnosis.jpg", height = 8, width = 12)
+ggsave(filename = "Figure 5.jpg", height = 8, width = 12)
 
 # Explaining results for cancer survivors
 summary <- results |>
@@ -120,7 +120,7 @@ p +
     limits = c(16, 84), breaks = seq(16, 84, 17)
   )
 
-ggsave(filename = "income_losses_diagnosis.jpg", height = 8, width = 10)
+ggsave(filename = "Figure 4.jpg", height = 8, width = 10)
 
 models <- summary |>
   group_by(Diagnosis, Gender) |>
@@ -150,4 +150,4 @@ p +
   theme(panel.grid.minor = element_blank(),
         legend.position = "top")
 
-ggsave(file = "annual_prevalence.jpg", height = 6, width = 8)  
+ggsave(file = "Figure 2.jpg", height = 6, width = 8)  
