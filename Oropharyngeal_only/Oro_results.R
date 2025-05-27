@@ -4,6 +4,7 @@ library(rms)
 library(ggridges)
 library(ggh4x)
 library(viridis)
+library(patchwork)
 results <- arrow::read_parquet(file = "simulation_results.parquet")
 discount = 0.03
 model_year = 2025
@@ -105,7 +106,6 @@ summary_table <- summary |>
   select(-c(Lost_income_low, Lost_income_high, Lost_income_median)) |>
   rename(Sex = Gender, `Cancer diagnosis` = Diagnosis, Age = Diagnosis_age)
 
-write.csv(summary_table, file = "summary_results.csv")
 
 dd <- datadist(summary)
 options(datadist = "dd")
@@ -155,11 +155,12 @@ remove(models)
 p <- vroom::vroom("./Data/NRDO extract/n_cases_predicted.csv") |>
   mutate(Sex = ifelse(gender == "F", "Female", "Male"),
          avg_cases = n/29) |>
-  filter(cancer_type == "Oropharynx") |>
+  filter(cancer_type %in% c("Cervix", "Oropharynx")) |>
   ggplot(aes(x = age_at_diagnosis, y = avg_cases, colour = Sex))
 
 p +
   geom_smooth(method = "gam", se = F, linewidth = 1.5) +
+  facet_wrap(vars(cancer_type), ncol = 1, scales = "free_y") +
   labs(x = "Age at diagnosis",
        y = "Cases per year (average)") +
   scale_colour_manual(values = c("Female" = "#D55E00", "Male" = "#0072B2")) +
@@ -167,4 +168,4 @@ p +
   theme(panel.grid.minor = element_blank(),
         legend.position = "top")
 
-ggsave(file = "./Oropharyngeal_only/rate.jpg", height = 4, width = 4)  
+ggsave(file = "./Oropharyngeal_only/rate.jpg", height = 4, width = 6)  
