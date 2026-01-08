@@ -1,4 +1,6 @@
 # Evaluate the minimum income modifier and vaccine cost for which vaccination is cost-saving in men and women
+
+# Don't bother with re-running; just take the output?
 source("0_Functions.R")
 load("model_data.Rdata")
 

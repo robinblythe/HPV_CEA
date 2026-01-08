@@ -1,7 +1,14 @@
 # Functions for analysis
 
-# Helper function to convert probabilities to odds
-get_odds <- function(OR, p0) {
+# Helper function to derive odds ratio from 2 x 2 tables in literature
+get_or <- function(a, b, c, d) {
+  p_employed_cancer <- rbeta(1, a, b)
+  p_employed_no_cancer <- rbeta(1, c, d)
+  (p_employed_cancer / (1 - p_employed_cancer))/(p_employed_no_cancer / (1 - p_employed_no_cancer))
+}
+
+# Helper function to convert probabilities to odds and multiply by OR, then convert back to probability
+apply_odds <- function(OR, p0) {
   p_odds <- p0 / (1 - p0)
   o <- p_odds * OR
   p1 <- o / (1 + o)
@@ -34,13 +41,11 @@ est_beta <- function(p, se) {
 # Main model function
 run_model_loop <- function(cancer_type, gender) {
   sims <- list()
-
-  # Workforce participation due to cancers
-  # https://jamanetwork.com/journals/jama/fullarticle/183387
-
   for (i in 1:iter) {
-    # Convert unemployment odds ratio to probability and combine with cancer-specific probabilities
+    # Convert baseline participation rate to odds and multiply by cancer employment OR
+    # Workforce participation due to cancers
     # https://jamanetwork.com/journals/jama/fullarticle/183387
+    
     sim_incomes <- median_income |>
       filter(
         Sex == gender,
@@ -49,11 +54,11 @@ run_model_loop <- function(cancer_type, gender) {
       mutate(
         Participation_rate_cancer =
           if (gender == "Female" & cancer_type %in% c("Cervical", "Vaginal", "Vulval", "Anal")) {
-            get_odds(1 / (1 - rbeta(1, 671, 648)) / (1 / (1 - rbeta(1, 816, 506))), Participation_rate)
+            apply_odds(get_or(671, 648, 816, 506), Participation_rate)
           } else if (cancer_type == "Oropharyngeal") {
-            get_odds(1 / (1 - rbeta(1, 75, 62)) / (1 / (1 - rbeta(1, 116, 26))), Participation_rate)
+            apply_odds(get_or(75, 62, 116, 26), Participation_rate)
           } else {
-            get_odds(1 / (1 - rbeta(1, 13480, 6886)) / (1 / (1 - rbeta(1, 133588, 24015))), Participation_rate)
+            apply_odds(get_or(423, 275, 1770, 659), Participation_rate)
           },
         Weighted_income_cancer = Participation_rate_cancer * Predicted_income * 12
       )
@@ -129,23 +134,22 @@ run_model_loop <- function(cancer_type, gender) {
 
     # Return to work/sick leave due to diagnosis (in)
     # https://doi.org/10.1002/pon.1820
-    rtw <- if (cancer_type == "Oropharyngeal") {
-      rgamma(1, shape = 2.456, scale = 3.069)
-    } else if (gender == "Male") {
-      rgamma(1, shape = 659.678, scale = 0.159) / 30.438
-    } else {
-      rgamma(1, shape = 148.905, scale = 1.088) / 30.438
-    }
-
-    # Percent of cancer attributable to HPV
+    rtw <- case_when(
+      cancer_type == "Oropharyngeal" ~ rgamma(1, shape = 2.456, scale = 3.069),
+      gender == "Male" & cancer_type != "Oropharyngeal" ~ rgamma(1, shape = 659.678, scale = 0.159) / 30.438,
+      gender == "Female" & cancer_type != "Oropharyngeal" ~ rgamma(1, shape = 148.905, scale = 1.088) / 30.438
+    )
+      
+    # Percent of cancer attributable to HPV 16/18
     # https://onlinelibrary.wiley.com/doi/epdf/10.1002/ijc.30716
     pct_hpv <- case_when(
-      cancer_type == "Cervical" ~ 1,
-      cancer_type == "Anal" ~ rbeta(1, shape1 = 35000, shape2 = (40000 - 35000)),
-      cancer_type == "Vaginal" ~ rbeta(1, shape1 = 12000, shape2 = (15000 - 12000)),
-      cancer_type == "Vulval" ~ rbeta(1, shape1 = 8500, shape2 = (34000 - 8500)),
-      cancer_type == "Penile" ~ rbeta(1, shape1 = 13000, shape2 = (26000 - 13000)),
-      cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 29000, shape2 = (96000 - 29000))
+      cancer_type == "Cervical" ~ rbeta(1, shape1 = 370000, shape2 = (530000 - 370000)),
+      cancer_type == "Anal" ~ rbeta(1, shape1 = 30000, shape2 = (40000 - 30000)),
+      cancer_type == "Vaginal" ~ rbeta(1, shape1 = 7400, shape2 = (15000 - 7400)),
+      cancer_type == "Vulval" ~ rbeta(1, shape1 = 6200, shape2 = (34000 - 6200)),
+      cancer_type == "Penile" ~ rbeta(1, shape1 = 9100, shape2 = (26000 - 9100)),
+      # Note the paper doesn't split oro in the 16/18 vs other HPV strains - used the same proportion as an assumption
+      cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 0.849*96000, shape2 = (96000 - 0.849*96000))
     )
 
     # Probability that HPV vaccination protects against cancer diagnosis (compared to naive)

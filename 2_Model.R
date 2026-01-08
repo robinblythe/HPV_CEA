@@ -4,35 +4,36 @@ load("model_data.Rdata")
 ### Run models
 library(rms)
 library(tidyverse)
-library(foreach)
-library(doParallel)
+library(furrr)
 
-set.seed(888)
-
+# Model starting parameters
 discount <- 0.03
 iter <- 10000
 age_start <- 16
 age_end <- 84
 model_year <- 2025
 
+# Model functions
 source("./0_Functions.R")
 
-
-# Prep parallel compute
-cores <- detectCores() - 2
-cl <- makeCluster(cores)
-registerDoParallel(cl)
-
-sims <- list()
-cancers <- c(
-  "Oropharyngeal", "Cervical", "Vulval", "Vaginal", "Anal",
-  "Oropharyngeal", "Penile", "Anal"
+# Set model inputs
+combs <- tibble(
+  cancers = c(
+    "Oropharyngeal", "Cervical", "Vulval", "Vaginal", "Anal",
+    "Oropharyngeal", "Penile", "Anal"
+  ),
+  sexes = c(rep("Female", 5), rep("Male", 3))
 )
-sexes <- c(rep("Female", 5), rep("Male", 3))
 
-sims <- foreach(i = 1:length(cancers), .packages = c("dplyr", "tidyr")) %dopar% {
-  run_model_loop(cancers[i], sexes[i])
-}
+plan(multisession, workers = availableCores() - 2)
+set.seed(80126)
 
-results <- do.call(rbind, sims) |> ungroup()
-arrow::write_parquet(results, "simulation_results.parquet")
+results <- future_map(1:nrow(combs), function(i){
+  inputs = combs[i,]
+  run_model_loop(cancer_type = inputs$cancers, gender = inputs$sexes)
+  }, 
+  .options = furrr_options(seed = TRUE)
+  )
+
+output <- do.call(rbind, results)
+arrow::write_parquet(output, "simulation_results.parquet")
