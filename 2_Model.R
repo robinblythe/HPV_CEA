@@ -26,11 +26,10 @@ combs <- tibble(
 )
 
 plan(multisession, workers = availableCores() - 2)
-set.seed(80126)
 
 results <- future_map(1:nrow(combs), function(i){
   inputs = combs[i,]
-  run_model_loop(cancer_type = inputs$cancers, gender = inputs$sexes)
+  run_model_loop(cancer_type = inputs$cancers, gender = inputs$sexes, seed = 80126)
   }, 
   .options = furrr_options(seed = TRUE)
   )

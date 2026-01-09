@@ -39,8 +39,11 @@ est_beta <- function(p, se) {
 
 
 # Main model function
-run_model_loop <- function(cancer_type, gender) {
+run_model_loop <- function(cancer_type, gender, seed) {
+  
+  set.seed(seed)
   sims <- list()
+  
   for (i in 1:iter) {
     # Convert baseline participation rate to odds and multiply by cancer employment OR
     # Workforce participation due to cancers
