@@ -1306,6 +1306,18 @@
       ],
       "Hash": "f4625e061cb2865f111b47ff163a5ca6"
     },
+    "progressr": {
+      "Package": "progressr",
+      "Version": "0.18.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "digest",
+        "utils"
+      ],
+      "Hash": "ef4b2bde05f5ad616f8084141c682fe6"
+    },
     "ps": {
       "Package": "ps",
       "Version": "1.8.0",

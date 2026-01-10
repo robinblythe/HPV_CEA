@@ -141,7 +141,7 @@ p <- vroom::vroom("./Data/NRDO extract/n_cases_predicted.csv") |>
   ggplot(aes(x = age_at_diagnosis, y = avg_cases, colour = Sex))
 
 p +
-  geom_smooth(method = "gam", se = F, linewidth = 1.5) +
+  geom_smooth(method = "gam", se = T, linewidth = 1.5) +
   facet_wrap(vars(cancer_type), scales = "free_y") +
   labs(x = "Age at diagnosis",
        y = "Cases per year (average)") +
