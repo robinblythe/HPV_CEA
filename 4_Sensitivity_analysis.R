@@ -184,11 +184,11 @@ combs <- tibble(
   sexes = c(rep("Female", 5), rep("Male", 3))
 )
 
-plan(multisession, workers = cores)
-on.exit(plan(sequential), add = TRUE)
-
 total_iter <- nrow(combs) * iter
 cores <- availableCores()
+
+plan(multisession, workers = cores)
+on.exit(plan(sequential), add = TRUE)
 
 results <- with_progress({
   p <- progressor(steps = total_iter)

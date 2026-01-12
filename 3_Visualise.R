@@ -150,4 +150,10 @@ p +
   theme(panel.grid.minor = element_blank(),
         legend.position = "top")
 
-ggsave(file = "Figure 2.jpg", height = 6, width = 8)  
+ggsave(file = "Figure 2.jpg", height = 6, width = 8)
+
+## Check overall savings of population-level program (requires herd immunity)
+girls <- 20649
+boys <- 21432
+
+total_cost <- (20649 + 21432) * 0.8 * cost_vc

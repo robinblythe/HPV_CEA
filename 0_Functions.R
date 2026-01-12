@@ -169,7 +169,7 @@ run_model <- function(cancer_type, gender, seed, iteration) {
       cancer_type == "Vulval" ~ rbeta(1, shape1 = 6200, shape2 = (34000 - 6200)),
       cancer_type == "Penile" ~ rbeta(1, shape1 = 9100, shape2 = (26000 - 9100)),
       # Note the paper doesn't split oro in the 16/18 vs other HPV strains - used the same proportion as an assumption
-      cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 0.849*96000, shape2 = (96000 - 0.849*96000))
+      cancer_type == "Oropharyngeal" ~ rbeta(1, shape1 = 29000*0.849, shape2 = (96000 - 29000*0.849))
     )
 
     # Probability that HPV vaccination protects against cancer diagnosis (compared to naive)

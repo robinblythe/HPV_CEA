@@ -48,3 +48,6 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 simulation_results.parquet
+sensitivity_analysis.parquet
+sensitivity_analysis.parquet
+sensitivity_analysis.parquet
