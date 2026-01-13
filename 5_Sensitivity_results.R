@@ -33,6 +33,23 @@ herd_pr <- 0.8
 pop_vaccinated <- (girls + boys) * herd_pr
 
 total_cost <- round(pop_vaccinated * cost_vc)
-total_benefit <- girls * herd_pr * df_nmb$NMB_vc_median[df_nmb$Gender == "Female"] + # vaccinated girls
+total_benefit <- round(
+  girls * herd_pr * df_nmb$NMB_vc_median[df_nmb$Gender == "Female"] + # vaccinated girls
   boys * herd_pr * df_nmb$NMB_vc_median[df_nmb$Gender == "Male"] + # vaccinated boys
-  girls * (1 - herd_pr) * df_nmb$NMB_herd
+  girls * (1 - herd_pr) * df_nmb$NMB_herd_median[df_nmb$Gender == "Female"] + # unvaccinated girls, herd immunity
+  boys * (1 - herd_pr) * df_nmb$NMB_herd_median[df_nmb$Gender == "Male"] # unvaccinated boys, herd immunity
+)
+ROI <- (total_benefit - total_cost)/total_cost
+
+benefit_low <- round(
+  girls * herd_pr * df_nmb$NMB_vc_low[df_nmb$Gender == "Female"] + # vaccinated girls
+  boys * herd_pr * df_nmb$NMB_vc_low[df_nmb$Gender == "Male"] + # vaccinated boys
+  girls * (1 - herd_pr) * df_nmb$NMB_herd_low[df_nmb$Gender == "Female"] + # unvaccinated girls, herd immunity
+  boys * (1 - herd_pr) * df_nmb$NMB_herd_low[df_nmb$Gender == "Male"] # unvaccinated boys, herd immunity
+)
+benefit_high <- round(
+  girls * herd_pr * df_nmb$NMB_vc_high[df_nmb$Gender == "Female"] + # vaccinated girls
+  boys * herd_pr * df_nmb$NMB_vc_high[df_nmb$Gender == "Male"] + # vaccinated boys
+  girls * (1 - herd_pr) * df_nmb$NMB_herd_high[df_nmb$Gender == "Female"] + # unvaccinated girls, herd immunity
+  boys * (1 - herd_pr) * df_nmb$NMB_herd_high[df_nmb$Gender == "Male"] # unvaccinated boys, herd immunity
+)
