@@ -112,7 +112,7 @@ p +
   theme_bw() +
   theme(panel.grid.minor = element_blank()) +
   scale_y_continuous(
-    name = "Productivity losses per cancer diagnosis (2025 SGD)",
+    name = "Income losses per cancer diagnosis (2025 SGD)",
     label = scales::comma
   ) +
   scale_x_continuous(
